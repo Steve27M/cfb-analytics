@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .config import DUCKDB_PATH, REPO_ROOT
+from .config import REPO_ROOT
 from .db import read_only_conn
 
 GOLD_DIR = REPO_ROOT / "data" / "gold"

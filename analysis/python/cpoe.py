@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-import statsmodels.formula.api as smf
 import statsmodels.api as sm
+import statsmodels.formula.api as smf
 
 from cfb_analytics.config import REPO_ROOT
 

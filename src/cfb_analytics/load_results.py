@@ -12,7 +12,6 @@ Creates: gold.model_coefficients, gold.model_metrics, gold.predictions, gold.mod
 from __future__ import annotations
 
 import glob
-from pathlib import Path
 
 import duckdb
 import pandas as pd

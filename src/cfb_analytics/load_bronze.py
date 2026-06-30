@@ -65,7 +65,8 @@ def load() -> None:
                 f"SELECT * FROM read_csv_auto({file_list}, union_by_name=true, "
                 f"sample_size=-1{types_clause})"
             )
-            n = con.execute(f"SELECT count(*) FROM bronze.{name}").fetchone()[0]
+            row = con.execute(f"SELECT count(*) FROM bronze.{name}").fetchone()
+            n = row[0] if row else 0
             print(f"  bronze.{name:12s} <- {len(files)} file(s)  {n:,} rows")
     finally:
         con.close()

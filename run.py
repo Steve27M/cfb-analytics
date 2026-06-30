@@ -1,13 +1,20 @@
 #!/usr/bin/env python
 """Polyglot pipeline orchestrator.
 
-Sequences: ingest (R) -> dbt build -> R/Python models -> Quarto render. Each stage is a
-SUBPROCESS; a non-zero exit aborts the run (clean failure handling). R and Python share state
-ONLY through the DuckDB warehouse, never in-memory.
+Sequences the whole build as SUBPROCESS stages; a non-zero exit aborts the run (clean failure
+handling). R and Python share state ONLY through flat files + the DuckDB warehouse, never
+in-memory — kill any stage and the pipeline fails cleanly.
 
-    uv run python run.py --season 2024        # full pipeline for a season
-    uv run python run.py ingest               # one stage
-    uv run python run.py build
+    ingest (R)        CFBD -> data/bronze/*.csv         (quota-aware, cached)
+    land   (Python)   bronze CSVs -> DuckDB bronze.*
+    build  (dbt)      staging -> snapshot(SCD2) -> silver -> gold (+ tests, freshness)
+    export (Python)   gold/silver -> data/gold/*.csv    (model-input feeds)
+    models (R)        book models M1-M5 -> data/results/*.csv
+    parity (Python)   parity fits + load_results -> gold.* (with R<->Python parity GATE)
+    dashboard (Quarto) -> docs/
+
+    uv run python run.py --season 2024        # full pipeline
+    uv run python run.py build                # one stage
 """
 from __future__ import annotations
 
@@ -15,7 +22,6 @@ import glob
 import os
 import shutil
 import subprocess
-import sys
 from pathlib import Path
 
 import typer
@@ -26,6 +32,11 @@ console = Console()
 app = typer.Typer(add_completion=False, help=__doc__)
 
 
+def _seasons() -> list[int]:
+    raw = os.getenv("CFB_SEASONS", "2023,2024")
+    return [int(s) for s in raw.split(",") if s.strip()]
+
+
 def _find_rscript() -> str:
     exe = shutil.which("Rscript")
     if exe:
@@ -34,17 +45,20 @@ def _find_rscript() -> str:
     cands = sorted(glob.glob(r"C:\Program Files\R\R-*\bin\Rscript.exe"), reverse=True)
     if cands:
         return cands[0]
-    raise typer.Exit(console.print("[red]Rscript not found — install R or add it to PATH.[/red]") or 1)
+    console.print("[red]Rscript not found — install R or add it to PATH.[/red]")
+    raise typer.Exit(1)
 
 
 def _find_quarto() -> str:
     exe = shutil.which("quarto")
     if exe:
         return exe
-    cands = glob.glob(r"C:\Program Files\Quarto\bin\quarto.cmd") + glob.glob(r"C:\Program Files\Quarto\bin\quarto.exe")
+    cands = (glob.glob(r"C:\Program Files\Quarto\bin\quarto.cmd")
+             + glob.glob(r"C:\Program Files\Quarto\bin\quarto.exe"))
     if cands:
         return cands[0]
-    raise typer.Exit(console.print("[red]quarto not found — install Quarto or add it to PATH.[/red]") or 1)
+    console.print("[red]quarto not found — install Quarto or add it to PATH.[/red]")
+    raise typer.Exit(1)
 
 
 def _run(cmd: list[str], env: dict | None = None) -> None:
@@ -61,27 +75,50 @@ def _dbt(*args: str) -> list[str]:
 
 @app.command()
 def ingest(season: str = typer.Option(None, help="Override CFB_SEASONS, e.g. '2024'.")) -> None:
-    """CFBD -> DuckDB bronze (quota-aware, cached)."""
+    """CFBD -> DuckDB bronze CSVs (quota-aware, cached)."""
     env = {"CFB_SEASONS": season} if season else {}
     _run([_find_rscript(), "ingest/ingest_cfbd.R"], env=env)
 
 
 @app.command()
+def land() -> None:
+    """Load the R-written bronze CSVs into DuckDB bronze.*."""
+    _run(["uv", "run", "python", "-m", "cfb_analytics.load_bronze"])
+
+
+@app.command()
 def build() -> None:
-    """dbt: staging -> silver -> gold (+ snapshot, tests, freshness)."""
+    """dbt: staging -> SCD2 snapshot (per season) -> silver -> gold (+ tests, freshness)."""
     _run(_dbt("deps"))
+    # staging must exist before the snapshot reads ref(stg_cfbd__teams)
+    _run(_dbt("run", "--select", "staging"))
+    # Reset SCD2 history so the per-season replay is deterministic: replaying seasons onto an
+    # already-populated snapshot would churn spurious versions (idempotency guard).
+    _run(["uv", "run", "python", "-c",
+          "import duckdb, os; "
+          "duckdb.connect(os.getenv('CFB_DUCKDB_PATH', 'data/cfb.duckdb'))"
+          ".execute('drop table if exists snapshots.team_snapshot')"])
+    # SCD2 history: replay the team snapshot one season at a time, in chronological order
+    for s in _seasons():
+        _run(_dbt("snapshot", "--vars", f"snapshot_season: {s}"))
     _run(_dbt("build"))
 
 
 @app.command()
+def export() -> None:
+    """Export gold/silver model-input feeds to data/gold/*.csv."""
+    _run(["uv", "run", "python", "-m", "cfb_analytics.export_gold"])
+
+
+@app.command()
 def models() -> None:
-    """Run the book's statistical models (R), writing residuals/metrics back to gold."""
+    """Run the book's statistical models in R, writing residuals/metrics to data/results/."""
     scripts = [
-        "analysis/R/stability.R",       # M1
-        "analysis/R/ryoe.R",            # M2/M3
-        "analysis/R/cpoe.R",            # M4
-        "analysis/R/poisson.R",         # M5
-        "analysis/R/game_model_train.R",
+        "analysis/R/stability.R",       # M1 metric stability
+        "analysis/R/ryoe.R",            # M2/M3 RYOE (lm)
+        "analysis/R/cpoe.R",            # M4 CPOE (glm binomial)
+        "analysis/R/poisson.R",         # M5 passing-TD Poisson
+        "analysis/R/game_model_train.R",  # game win-prob model (tidymodels) — phase 3b
         "analysis/R/game_model_score.R",
     ]
     rscript = _find_rscript()
@@ -93,21 +130,34 @@ def models() -> None:
 
 
 @app.command()
+def parity() -> None:
+    """Run the Python parity fits, then load all results to gold with the R<->Python parity gate."""
+    for s in ["stability", "ryoe", "cpoe", "poisson"]:
+        script = f"analysis/python/{s}.py"
+        if (REPO_ROOT / script).exists():
+            _run(["uv", "run", "python", script])
+    _run(["uv", "run", "python", "-m", "cfb_analytics.load_results"])
+
+
+@app.command()
 def dashboard() -> None:
     """Render the Quarto dashboard to docs/."""
     _run([_find_quarto(), "render", "dashboard/dashboard.qmd"])
 
 
 @app.callback(invoke_without_command=True)
-def main(ctx: typer.Context, season: str = typer.Option(None, help="Season for a full run.")) -> None:
+def main(ctx: typer.Context,
+         season: str = typer.Option(None, help="Season for a full run.")) -> None:
     """With no subcommand, run the whole pipeline end-to-end."""
     if ctx.invoked_subcommand is not None:
         return
     env = {"CFB_SEASONS": season} if season else {}
     _run([_find_rscript(), "ingest/ingest_cfbd.R"], env=env)
-    _run(_dbt("deps"))
-    _run(_dbt("build"))
+    _run(["uv", "run", "python", "-m", "cfb_analytics.load_bronze"])
+    build()
+    export()
     models()
+    parity()
     dashboard()
     console.print("[bold green]Pipeline complete.[/bold green]")
 
