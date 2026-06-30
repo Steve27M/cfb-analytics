@@ -43,7 +43,8 @@ def parity_check(coef: pd.DataFrame) -> pd.DataFrame:
 def load() -> None:
     coef = _read_glob("coef__*.csv")
     metrics = _read_glob("metrics__*.csv")
-    preds = _read_glob("pred__*.csv")
+    preds = _read_glob("pred__*.csv")          # play-grain RYOE/CPOE residuals
+    game_preds = _read_glob("gamepred__*.csv")  # game-grain win-prob predictions
     if coef.empty:
         raise SystemExit("no results found in data/results — run the R/Python models first")
 
@@ -56,6 +57,7 @@ def load() -> None:
             ("model_coefficients", coef),
             ("model_metrics", metrics),
             ("predictions", preds),
+            ("game_predictions", game_preds),
             ("model_parity", parity),
         ]:
             if df.empty:

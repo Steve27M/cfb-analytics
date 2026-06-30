@@ -83,6 +83,49 @@ FEEDS: dict[str, str] = {
         group by p.game_id, p.season, p.week, p.offense_team, p.defense_team, r.defense_rating
         having count(*) filter (where p.is_pass_attempt) > 0
     """,
+    # Game win-prob feed: one row per FBS-vs-FBS game. Features are HOME-minus-AWAY differences
+    # of each side's season-to-date "entering" form (strictly prior games → leakage-safe). The
+    # consensus spread is the market benchmark (not a feature); home_won is the target.
+    "game_model": """
+        with mte as (select * from gold.mart_team_efficiency),
+        home as (
+            select game_id, std_net_epa_entering, std_off_epa_entering, std_def_epa_entering,
+                   roll3_net_epa_entering, std_win_pct_entering, sos_sp_entering,
+                   games_played_entering
+            from mte where home_away = 'home'
+        ),
+        away as (
+            select game_id, std_net_epa_entering, std_off_epa_entering, std_def_epa_entering,
+                   roll3_net_epa_entering, std_win_pct_entering, sos_sp_entering,
+                   games_played_entering
+            from mte where home_away = 'away'
+        )
+        select
+            g.game_id,
+            g.season,
+            g.week,
+            cast(g.home_won as integer)                             as home_won,
+            g.home_spread_consensus,
+            h.std_net_epa_entering - a.std_net_epa_entering         as net_epa_diff,
+            h.std_off_epa_entering - a.std_off_epa_entering         as off_epa_diff,
+            h.std_def_epa_entering - a.std_def_epa_entering         as def_epa_diff,
+            h.roll3_net_epa_entering - a.roll3_net_epa_entering     as roll3_net_epa_diff,
+            h.std_win_pct_entering - a.std_win_pct_entering         as win_pct_diff,
+            h.sos_sp_entering - a.sos_sp_entering                   as sos_diff,
+            least(h.games_played_entering, a.games_played_entering) as min_games_entering
+        from gold.dim_game g
+        inner join home h on g.game_id = h.game_id
+        inner join away a on g.game_id = a.game_id
+        where g.home_won is not null
+          and g.home_spread_consensus is not null
+          and least(h.games_played_entering, a.games_played_entering) >= 2
+          and h.std_net_epa_entering is not null
+          and a.std_net_epa_entering is not null
+          and h.roll3_net_epa_entering is not null
+          and a.roll3_net_epa_entering is not null
+          and h.sos_sp_entering is not null
+          and a.sos_sp_entering is not null
+    """,
 }
 
 

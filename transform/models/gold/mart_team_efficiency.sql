@@ -72,20 +72,22 @@ windowed as (
         -- season-to-date INCLUDING the current game (for end-of-season leaderboards)
         avg(net_epa_per_play) over w_incl               as std_net_epa_to_date
     from base
+    -- game_id is a deterministic tiebreaker so the cumulative "entering" frames are reproducible
+    -- even if a team ever has two games in one week (the windows must not depend on scan order).
     window
         w_prior as (
             partition by team_id, season
-            order by week
+            order by week, game_id
             rows between unbounded preceding and 1 preceding
         ),
         w_roll3 as (
             partition by team_id, season
-            order by week
+            order by week, game_id
             rows between 3 preceding and 1 preceding
         ),
         w_incl as (
             partition by team_id, season
-            order by week
+            order by week, game_id
             rows between unbounded preceding and current row
         )
 
