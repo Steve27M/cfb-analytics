@@ -1,0 +1,112 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv sync)",
+      "Bash(uv run ruff:*)",
+      "Bash(uv run mypy:*)",
+      "Bash(uv run pytest:*)",
+      "Bash(uv run python:*)",
+      "Bash(uv run dbt parse:*)",
+      "Bash(uv run dbt build:*)",
+      "Bash(uv run dbt test:*)",
+      "Bash(uv run dbt run:*)",
+      "Bash(uv run dbt compile:*)",
+      "Bash(uv run dbt deps:*)",
+      "Bash(uv run dbt ls:*)",
+      "Bash(uv run dbt docs generate:*)",
+      "Bash(uv run dbt source freshness:*)",
+      "Bash(dbt parse:*)",
+      "Bash(dbt build:*)",
+      "Bash(dbt test:*)",
+      "Bash(dbt source freshness:*)",
+      "Bash(sqlfluff lint:*)",
+      "Bash(sqlfluff fix:*)",
+      "Bash(Rscript:*)",
+      "Bash(quarto render:*)",
+      "Bash(quarto preview:*)",
+      "Bash(duckdb:*)",
+      "Bash(./scripts/check.sh)",
+      "Bash(git status)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Read(./**)",
+      "Edit(ingest/**)",
+      "Edit(transform/**)",
+      "Edit(analysis/**)",
+      "Edit(src/**)",
+      "Edit(dashboard/**)",
+      "Edit(scripts/**)",
+      "Edit(tests/**)",
+      "Edit(docs/**)",
+      "Edit(evals/**)"
+    ],
+    "ask": [
+      "Bash(uv run python run.py:*)",
+      "Bash(Rscript ingest/*:*)",
+      "Bash(uv run dbt build --target prod:*)",
+      "Bash(uv run dbt run --target prod:*)",
+      "Bash(uv run dbt build --full-refresh:*)",
+      "Bash(uv run dbt run --full-refresh:*)",
+      "Bash(uv run dbt run-operation:*)",
+      "Bash(uv run dbt snapshot:*)",
+      "Bash(uv run dbt seed:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Edit(CLAUDE.md)",
+      "Edit(PROJECT_PLAN.md)",
+      "Edit(dbt_project.yml)",
+      "Edit(transform/dbt_project.yml)",
+      "Edit(transform/profiles.yml)",
+      "Edit(.claude/**)",
+      "Edit(docs/principles/**)"
+    ],
+    "deny": [
+      "Bash(rm -rf:*)",
+      "Bash(uv pip install:*)",
+      "Bash(pip install:*)",
+      "Read(.env)",
+      "Read(.Renviron)",
+      "Read(**/credentials*)",
+      "Read(**/secrets/**)",
+      "Read(profiles.yml)",
+      "Edit(.env)",
+      "Edit(.Renviron)",
+      "Edit(**/secrets/**)",
+      "Edit(**/credentials*)",
+      "Edit(**/raw/**)",
+      "Edit(data/**)",
+      "Write(data/**)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Edit|Write",
+        "hooks": [
+          { "type": "command", "command": "python .claude/hooks/guard_de.py" },
+          { "type": "command", "command": "python .claude/hooks/guard_dbt.py" },
+          { "type": "command", "command": "python .claude/hooks/guard_ds.py" },
+          { "type": "command", "command": "python .claude/hooks/guard_ml.py" }
+        ]
+      }
+    ]
+  },
+  "mcpServers": {
+    "de-tools": {
+      "command": "uv",
+      "args": ["run", "python", "tools/de_mcp_server.py"]
+    },
+    "dbt-tools": {
+      "command": "uv",
+      "args": ["run", "python", "tools/dbt_mcp_server.py"]
+    },
+    "ds-tools": {
+      "command": "uv",
+      "args": ["run", "python", "tools/ds_mcp_server.py"]
+    },
+    "ml-tools": {
+      "command": "uv",
+      "args": ["run", "python", "tools/ml_mcp_server.py"]
+    }
+  }
+}

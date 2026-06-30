@@ -1,0 +1,130 @@
+version: 2
+
+models:
+  - name: dim_team
+    description: >
+      One row per team SCD2 version (team_sk). Conference/division realignment is versioned
+      across seasons via valid_from_season / valid_to_season; is_current flags the live row.
+    columns:
+      - name: team_sk
+        description: Surrogate per version = hash(team_id, valid_from_season). Grain key.
+        data_tests: [not_null, unique]
+      - name: team_id
+        description: Durable natural key (stable across versions).
+        data_tests: [not_null]
+      - name: conference
+        data_tests: [not_null]
+      - name: valid_from_season
+        data_tests: [not_null]
+
+  - name: dim_calendar
+    description: One row per season + week + season_type (calendar_sk).
+    columns:
+      - name: calendar_sk
+        data_tests: [not_null, unique]
+      - name: season
+        data_tests: [not_null]
+
+  - name: dim_game
+    description: >
+      One row per game (game_sk / game_id). Game context + consensus betting market;
+      outcome measures live in fct_team_game.
+    columns:
+      - name: game_sk
+        data_tests: [not_null, unique]
+      - name: game_id
+        data_tests: [not_null, unique]
+      - name: season
+        data_tests: [not_null]
+      # volume guard: the warehouse should never silently lose the bulk of its games
+      - name: total_points
+        data_tests:
+          - dbt_utils.accepted_range: { min_value: 0, max_value: 200 }
+
+  - name: fct_team_game
+    description: >
+      One row per team per game (game_id + team_id). Outcome, betting-line cover, and
+      offensive/defensive EPA + success-rate aggregates. FKs resolve to the season-correct
+      dim_team version, dim_game, and dim_calendar.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [game_id, team_id]
+      # volume: ~2 rows per FBS-touching game per season; alert if the fact collapses
+      - dbt_expectations.expect_table_row_count_to_be_between:
+          min_value: 3000
+          max_value: 4500
+    columns:
+      - name: team_game_sk
+        data_tests: [not_null, unique]
+      - name: game_sk
+        description: FK to dim_game.
+        data_tests:
+          - not_null
+          - relationships: { to: ref('dim_game'), field: game_sk }
+      - name: team_sk
+        description: FK to dim_team (season-correct version).
+        data_tests:
+          - not_null
+          - relationships: { to: ref('dim_team'), field: team_sk }
+      - name: calendar_sk
+        data_tests:
+          - relationships: { to: ref('dim_calendar'), field: calendar_sk }
+      - name: points_for
+        data_tests: [not_null]
+      - name: offensive_epa_per_play
+        description: Mean EPA over non-garbage scrimmage plays; null for FCS opponents.
+
+  - name: fct_play
+    description: >
+      One row per play (play_key). Play-level EPA/WP fact and the landing spot for the
+      RYOE/CPOE "over expected" residuals written back by the R/Python models.
+    data_tests:
+      - dbt_expectations.expect_table_row_count_to_be_between:
+          min_value: 500000
+          max_value: 540000
+    columns:
+      - name: play_key
+        data_tests: [not_null, unique]
+      - name: game_sk
+        data_tests:
+          - not_null
+          - relationships: { to: ref('dim_game'), field: game_sk }
+      - name: season
+        data_tests: [not_null]
+
+  - name: mart_team_efficiency
+    description: >
+      One row per team per game (game_id + team_id), FBS only. Per-game offensive/defensive
+      EPA plus season-to-date and rolling-form context. "Entering" metrics use a strictly
+      prior-rows window (no current-game leakage), so they describe form before kickoff.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [game_id, team_id]
+    columns:
+      - name: team_game_sk
+        data_tests: [not_null, unique]
+      - name: team_sk
+        data_tests:
+          - not_null
+          - relationships: { to: ref('dim_team'), field: team_sk }
+      - name: net_epa_per_play
+        description: Offensive minus defensive EPA/play for the game.
+      - name: std_net_epa_entering
+        description: Season-to-date net EPA/play BEFORE this game (null for a team's opener).
+
+  - name: mart_player_rushing
+    description: >
+      One row per rusher per season per team. Season rushing production + odd/even split-half
+      inputs for M1 metric-stability; the landing base for RYOE residuals (M2/M3).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [rusher_player_name, season, team]
+    columns:
+      - name: rusher_player_name
+        data_tests: [not_null]
+      - name: rush_attempts
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range: { min_value: 1 }
+      - name: yards_per_carry
+        data_tests: [not_null]

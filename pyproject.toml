@@ -1,0 +1,57 @@
+[project]
+name = "cfb-analytics"
+version = "0.1.0"
+description = "Polyglot college-football analytics: CFBD -> DuckDB -> dbt -> R/Python models -> Quarto dashboard"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    # --- pipeline / warehouse ---
+    "duckdb>=1.1",
+    "dbt-duckdb>=1.9",
+    "pyarrow>=17",
+    # --- ingestion (Python fallback to cfbfastR) ---
+    "requests>=2.32",
+    "tenacity>=9.0",          # retry/backoff for CFBD calls
+    "python-dotenv>=1.0",
+    # --- data / stats / ML (Python side of the book's methods) ---
+    "pandas>=2.2",
+    "numpy>=2.0",
+    "statsmodels>=0.14",      # OLS, GLM (logistic/Poisson), MixedLM
+    "scikit-learn>=1.5",      # PCA, KMeans, parity baseline
+    "xgboost>=2.1",
+    "matplotlib>=3.9",
+    # --- scraping (M8, optional) ---
+    "beautifulsoup4>=4.12",
+    "lxml>=5.3",
+    # --- orchestration CLI ---
+    "typer>=0.12",
+    "rich>=13.9",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.7",
+    "mypy>=1.13",
+    "pytest>=8.3",
+]
+
+[tool.uv]
+package = true
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cfb_analytics"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true

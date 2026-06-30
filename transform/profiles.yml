@@ -1,0 +1,12 @@
+# dbt-duckdb profile. Run dbt from the repo root, e.g.:
+#   uv run dbt build --project-dir transform --profiles-dir transform
+# The DuckDB path is resolved relative to the repo root (the cwd when invoking dbt).
+cfb_analytics:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: "{{ env_var('CFB_DUCKDB_PATH', 'data/cfb.duckdb') }}"
+      threads: 4
+      # Keep a single writer; the R model steps open the same file read/write between dbt runs.
+      extensions: []

@@ -1,0 +1,104 @@
+version: 2
+
+models:
+  - name: stg_cfbd__games
+    description: >
+      One row per game (game_id). Renamed/recast 1:1 from bronze.games — no joins or
+      business logic. Source for dim_game, fct_team_game, and the betting-line join.
+    columns:
+      - name: game_id
+        description: CFBD game identifier. Grain key.
+        data_tests: [not_null, unique]
+      - name: season
+        data_tests:
+          - not_null
+          - accepted_values: { values: [2023, 2024], quote: false }
+      - name: home_team_id
+        data_tests: [not_null]
+      - name: away_team_id
+        data_tests: [not_null]
+
+  - name: stg_cfbd__plays
+    description: >
+      One row per play as delivered by cfbfastR::load_cfb_pbp. Renamed/recast 1:1 from
+      bronze.plays. NOTE: there is no reliable natural key — cfbfastR rounds id_play to a
+      double upstream (collisions), so play_id_raw is NOT unique and a stable surrogate is
+      minted downstream in silver_plays. Staging therefore tests only column-level rules.
+    columns:
+      - name: game_id
+        description: Parent game. FK to stg_cfbd__games.game_id.
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_cfbd__games')
+              field: game_id
+      - name: season
+        data_tests:
+          - not_null
+          - accepted_values: { values: [2023, 2024], quote: false }
+      - name: game_play_number
+        data_tests: [not_null]
+
+  - name: stg_cfbd__lines
+    description: >
+      One row per game per sportsbook provider (game_id + provider). Renamed/recast 1:1
+      from bronze.lines. Multiple providers per game are collapsed to a single consensus
+      spread/total downstream in silver.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [game_id, provider]
+    columns:
+      - name: game_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_cfbd__games')
+              field: game_id
+      - name: provider
+        data_tests: [not_null]
+
+  - name: stg_cfbd__ratings_sp
+    description: >
+      One row per team per season (season + team). SP+ ratings, renamed/recast 1:1 from
+      bronze.ratings_sp.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [season, team]
+    columns:
+      - name: team
+        data_tests: [not_null]
+      - name: season
+        data_tests:
+          - not_null
+          - accepted_values: { values: [2023, 2024], quote: false }
+      - name: sp_rating
+        data_tests: [not_null]
+
+  - name: stg_cfbd__teams
+    description: >
+      One row per team per season (team_id + season). Team + venue metadata, renamed/recast
+      1:1 from bronze.teams. Feeds the dim_team SCD2 snapshot.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [team_id, season]
+    columns:
+      - name: team_id
+        data_tests: [not_null]
+      - name: school
+        data_tests: [not_null]
+      - name: season
+        data_tests:
+          - not_null
+          - accepted_values: { values: [2023, 2024], quote: false }
+
+  - name: stg_cfbd__calendar
+    description: >
+      One row per season + week + season_type. Renamed/recast 1:1 from bronze.calendar.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [season, week, season_type]
+    columns:
+      - name: season
+        data_tests: [not_null]
+      - name: week
+        data_tests: [not_null]

@@ -1,0 +1,89 @@
+version: 2
+
+models:
+  - name: silver_games
+    description: >
+      One row per completed game (game_id). Conformed game header with derived outcome
+      fields (home_margin, total_points, home_won). Not-yet-final games are dropped.
+    columns:
+      - name: game_id
+        description: Grain key.
+        data_tests: [not_null, unique]
+      - name: season
+        data_tests: [not_null]
+      - name: home_team_id
+        data_tests: [not_null]
+      - name: away_team_id
+        data_tests: [not_null]
+      - name: total_points
+        data_tests:
+          - dbt_utils.accepted_range: { min_value: 0, max_value: 200 }
+
+  - name: silver_team_game
+    description: >
+      One row per team per game (game_id + team_id) — the game header unpivoted to a
+      team-centric long shape (two rows per game). Spine of fct_team_game.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [game_id, team_id]
+    columns:
+      - name: game_id
+        data_tests:
+          - not_null
+          - relationships: { to: ref('silver_games'), field: game_id }
+      - name: team_id
+        data_tests: [not_null]
+      - name: home_away
+        data_tests:
+          - accepted_values: { values: ['home', 'away'] }
+      - name: points_for
+        data_tests: [not_null]
+
+  - name: silver_plays
+    description: >
+      One row per play (play_key). Exact-duplicate rows removed; a deterministic surrogate
+      key is minted because cfbfastR delivers no usable natural play key (id_play is rounded
+      to a double upstream). is_garbage_time flags blowout context where EPA/WP are noise.
+    columns:
+      - name: play_key
+        description: Minted surrogate = hash(game_id, game_play_number, intra-seq). Grain key.
+        data_tests: [not_null, unique]
+      - name: game_id
+        data_tests:
+          - not_null
+          - relationships: { to: ref('silver_games'), field: game_id }
+      - name: season
+        data_tests: [not_null]
+      - name: epa
+        description: Expected points added (may be null on non-scrimmage plays).
+
+  - name: silver_lines
+    description: >
+      One row per game (game_id). Sportsbook rows collapsed to a single consensus line via
+      the median spread/total across providers. spread is home-perspective (negative = home
+      favored).
+    columns:
+      - name: game_id
+        description: Grain key.
+        data_tests:
+          - not_null
+          - unique
+          - relationships: { to: ref('silver_games'), field: game_id }
+      - name: provider_count
+        data_tests:
+          - dbt_utils.accepted_range: { min_value: 1 }
+
+  - name: silver_ratings_sp
+    description: >
+      One row per team per season (season + team). Conformed SP+ ratings consumed by the
+      efficiency marts and the game model's opponent-strength features.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [season, team]
+    columns:
+      - name: team
+        data_tests: [not_null]
+      - name: season
+        data_tests: [not_null]
+      - name: sp_rating
+        data_tests: [not_null]

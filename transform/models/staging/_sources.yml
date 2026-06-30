@@ -1,0 +1,30 @@
+version: 2
+
+sources:
+  - name: bronze
+    description: >
+      Raw, immutable, append-only landing zone written by the R/Python ingestion
+      (ingest/ingest_cfbd.R). Every row carries lineage columns: "cfb_season", "cfb_pull_id",
+      "cfb_fetched_at". dbt reads bronze via source() ONLY in staging — never elsewhere.
+    schema: bronze
+    # Freshness uses the string lineage column cast to a timestamp (DuckDB expression).
+    loaded_at_field: 'CAST(cfb_fetched_at AS TIMESTAMP)'
+    freshness:
+      warn_after: { count: 30, period: day }
+      error_after: { count: 120, period: day }
+    tables:
+      - name: plays
+        description: Play-by-play (quota-free via cfbfastR::load_cfb_pbp), carries EPA/wp.
+      - name: games
+        description: Game results & metadata (cfbd_game_info).
+      - name: lines
+        description: Betting lines / spreads & totals (cfbd_betting_lines).
+      - name: ratings_sp
+        description: SP+ team ratings (cfbd_ratings_sp).
+      - name: teams
+        description: Team metadata — conference, division, venue (cfbd_team_info).
+      - name: calendar
+        description: Season calendar — weeks & dates (cfbd_calendar).
+      - name: ingest_log
+        description: One row per ingestion event (table, season, rows, source, pull_id).
+        freshness: null

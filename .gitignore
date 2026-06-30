@@ -1,0 +1,53 @@
+# --- Secrets (NEVER commit) ---
+.env
+.env.*
+!.env.example
+.Renviron
+*.key
+
+# --- Data (CFBD: gitignore raw data per §9 terms posture) ---
+data/
+*.duckdb
+*.duckdb.wal
+*.parquet
+*.csv
+!data/.gitkeep
+
+# --- Models / artifacts ---
+artifacts/models/*.rds
+artifacts/models/*.pkl
+artifacts/metrics.json
+!artifacts/.gitkeep
+
+# --- Dashboard build output (embeds data → do not publish HTML) ---
+docs/*.html
+dashboard/*.html
+dashboard/*_files/
+
+# --- Python ---
+.venv/
+__pycache__/
+*.py[cod]
+.uv/
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+
+# --- R / renv ---
+renv/library/
+renv/staging/
+renv/python/
+.Rhistory
+.RData
+.Rproj.user/
+
+# --- dbt ---
+target/
+dbt_packages/
+logs/
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

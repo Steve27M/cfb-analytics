@@ -1,0 +1,35 @@
+name: "cfb_analytics"
+version: "0.1.0"
+config-version: 2
+profile: "cfb_analytics"
+
+model-paths: ["models"]
+snapshot-paths: ["snapshots"]
+macro-paths: ["macros"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+# Bronze is produced by the R/Python ingestion (append-only, immutable) and exposed to dbt
+# as sources. dbt owns staging -> silver -> gold only.
+models:
+  cfb_analytics:
+    staging:
+      +schema: staging
+      +materialized: view
+    silver:
+      +schema: silver
+      +materialized: view
+    gold:
+      +schema: gold
+      +materialized: table
+
+snapshots:
+  cfb_analytics:
+    +target_schema: snapshots
+
+seeds:
+  cfb_analytics:
+    +schema: seeds

@@ -1,0 +1,4 @@
+# Copy to .Renviron (repo root) and fill in. .Renviron is gitignored — NEVER commit your key.
+# cfbfastR reads CFBD_API_KEY automatically (see cfbfastR::register_cfbd()).
+CFBD_API_KEY=
+CFB_DUCKDB_PATH=data/cfb.duckdb
