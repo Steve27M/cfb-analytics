@@ -225,6 +225,26 @@ arch |>
   tab_options(table.font.size = px(12))
 ```
 
+## Expected points by field position — the EPA foundation
+
+Every efficiency metric here is built on **EPA** (expected points added). This is the expected-
+points surface it rests on: the mean expected points for a first-and-10 (and later downs) at each
+spot on the field — from ~6.4 points at the goal line down to *negative* when backed up near your
+own end zone. The monotonic, football-sensible shape is the sanity check for the whole EPA layer.
+
+```{r ep-surface}
+eps <- gold("ep_surface.csv") |> mutate(down = factor(down))
+
+ggplot(eps, aes(yards_to_goal, expected_points, colour = down)) +
+  geom_hline(yintercept = 0, colour = "grey70") +
+  geom_line(linewidth = 0.9) +
+  scale_x_reverse() +
+  scale_colour_brewer(palette = "Set1", name = "Down") +
+  labs(title = "Expected points by field position and down (2023–24)",
+       subtitle = "x reversed: goal line at right. EP falls with distance and later downs.",
+       x = "Yards to opponent's goal", y = "Expected points")
+```
+
 # Part 2 — Evaluating the models
 
 ## The game win-probability model

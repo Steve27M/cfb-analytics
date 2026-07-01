@@ -169,6 +169,25 @@ FEEDS: dict[str, str] = {
         inner join def_agg d on o.team = d.team and o.season = d.season
         where o.off_games >= 8
     """,
+    # Expected-points surface: mean cfbfastR EP by field position (yards to goal) and down —
+    # the canonical "expected points by field position" curve. Built from the calibrated
+    # play-level EPA already in the warehouse (a from-scratch next-score EP model is not rebuilt:
+    # it would duplicate this validated EP, and next-score labels reconstructed from the
+    # available start-of-play scores are only ~91% exact). This is the play-level EPA view.
+    "ep_surface": """
+        select
+            down,
+            yards_to_goal,
+            avg(ep_before)      as expected_points,
+            count(*)            as n_plays
+        from gold.fct_play
+        where down between 1 and 4
+          and yards_to_goal between 1 and 99
+          and ep_before is not null
+          and not is_garbage_time
+        group by down, yards_to_goal
+        having count(*) >= 20
+    """,
 }
 
 
