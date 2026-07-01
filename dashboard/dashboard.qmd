@@ -343,6 +343,30 @@ tibble(
   tab_options(table.font.size = px(12))
 ```
 
+### 2026 season — live preseason forecast
+
+Applying the priors model to the **2026 schedule** (pulled from CFBD, not yet played) using each
+team's 2025 carryover. These are *preseason* probabilities — useful but deliberately humble (see the
+accuracy gap above). Below: the week-1 openers the model sees as near coin-flips (where it's least
+sure), and its most confident picks.
+
+```{r forecast-2026}
+fpath <- file.path("data", "gold", "forecast_2026.csv")
+if (file.exists(fpath)) {
+  fc <- readr::read_csv(fpath, show_col_types = FALSE) |> filter(week == 1)
+  toss <- fc |> mutate(edge = abs(home_win_prob - 0.5)) |> slice_min(edge, n = 8) |>
+    transmute(Matchup = paste(away_team, "@", home_team),
+              `Home win prob` = home_win_prob, Lean = favored_team)
+  gt(toss) |>
+    tab_header(title = "2026 week 1 — the model's closest calls",
+               subtitle = "Preseason priors only; ~50% = genuine toss-up") |>
+    fmt_percent(columns = `Home win prob`, decimals = 0) |>
+    tab_options(table.font.size = px(12))
+} else {
+  cat("_Run `uv run python -m cfb_analytics.forecast 2026` to populate 2026 forecasts._")
+}
+```
+
 ## Model coefficients & fit (M3–M5)
 
 ```{r model-metrics}

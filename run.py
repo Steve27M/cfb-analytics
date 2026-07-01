@@ -146,6 +146,12 @@ def parity() -> None:
 
 
 @app.command()
+def forecast(season: int = typer.Argument(2026, help="Future season to forecast.")) -> None:
+    """Score an upcoming (unplayed) season's schedule with the preseason priors model."""
+    _run(["uv", "run", "python", "-m", "cfb_analytics.forecast", str(season)])
+
+
+@app.command()
 def dashboard() -> None:
     """Prepare feeds, render Quarto to docs/, refresh preview PNGs, publish the Pages index."""
     _run(["uv", "run", "python", "dashboard/prepare_dashboard_data.py"])

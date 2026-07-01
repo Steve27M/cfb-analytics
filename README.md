@@ -167,6 +167,7 @@ range — R, Python, and SQL each doing what they're best at, cross-checked agai
 ## Roadmap
 
 Done: ingestion (API + ethical scrape) → medallion → Kimball star + SCD2 → book models **M1–M8**
-(R + Python) → game win-probability model → Quarto dashboard live on GitHub Pages. Deferred but
+(R + Python) → in-season + preseason win-probability models → **live 2026-season forecast** (the
+priors model applied to CFBD's 2026 schedule) → Quarto dashboard live on GitHub Pages. Deferred but
 pre-structured: GitHub Actions **CI** (lint + `dbt build`) and a **BigQuery** push of the gold
 tables. See [`PROJECT_PLAN.md`](PROJECT_PLAN.md) for the full plan.
