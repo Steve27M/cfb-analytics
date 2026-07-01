@@ -214,6 +214,37 @@ FEEDS: dict[str, str] = {
         join wins w on r.team = w.team and r.season = w.season
         where s.sp_rating is not null
     """,
+    # Preseason priors feed: one row per game with features from each team's PRIOR season
+    # (SP+ rating, season net EPA, win rate) — so a game can be predicted before any current-
+    # season form exists (openers / week 1). Home-minus-away differences; home_won is the target.
+    # This is what lets the pipeline forecast a fresh season's schedule the moment it's loaded.
+    "game_priors": """
+        with team_eff as (
+            select team, season,
+                   avg(net_epa_per_play) as net_epa,
+                   avg(case when won then 1.0 else 0.0 end) as win_pct
+            from gold.mart_team_efficiency
+            group by team, season
+        ),
+        team_season as (
+            select r.team, r.season, r.sp_rating, e.net_epa, e.win_pct
+            from silver.silver_ratings_sp r
+            left join team_eff e on r.team = e.team and r.season = e.season
+        )
+        select
+            g.game_id,
+            g.season,
+            cast(g.home_won as integer)                             as home_won,
+            (h.sp_rating - a.sp_rating)                             as prior_sp_diff,
+            (h.net_epa - a.net_epa)                                 as prior_net_epa_diff,
+            (h.win_pct - a.win_pct)                                 as prior_win_pct_diff
+        from gold.dim_game g
+        join team_season h on g.home_team = h.team and h.season = g.season - 1
+        join team_season a on g.away_team = a.team and a.season = g.season - 1
+        where g.home_won is not null
+          and h.sp_rating is not null and a.sp_rating is not null
+          and h.net_epa is not null and a.net_epa is not null
+    """,
 }
 
 

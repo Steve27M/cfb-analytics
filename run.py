@@ -122,8 +122,9 @@ def models() -> None:
         "analysis/R/archetypes.R",      # M6 PCA + k-means archetypes
         "analysis/R/shrinkage.R",       # M7 multilevel shrinkage
         "analysis/R/recruiting.R",      # M8 recruiting vs production
-        "analysis/R/game_model_train.R",  # game win-prob model (tidymodels) — phase 3b
+        "analysis/R/game_model_train.R",  # in-season game win-prob model (tidymodels)
         "analysis/R/game_model_score.R",
+        "analysis/R/priors_model.R",    # preseason priors model (predicts before season form)
     ]
     rscript = _find_rscript()
     for s in scripts:
@@ -137,7 +138,7 @@ def models() -> None:
 def parity() -> None:
     """Run the Python parity fits, then load all results to gold with the R<->Python parity gate."""
     for s in ["stability", "ryoe", "cpoe", "poisson", "archetypes", "shrinkage",
-              "recruiting", "game_model"]:
+              "recruiting", "game_model", "priors_model"]:
         script = f"analysis/python/{s}.py"
         if (REPO_ROOT / script).exists():
             _run(["uv", "run", "python", script])
@@ -146,7 +147,7 @@ def parity() -> None:
 
 @app.command()
 def dashboard() -> None:
-    """Prepare feeds (Python/DuckDB), render Quarto to docs/, refresh preview PNGs, publish index."""
+    """Prepare feeds, render Quarto to docs/, refresh preview PNGs, publish the Pages index."""
     _run(["uv", "run", "python", "dashboard/prepare_dashboard_data.py"])
     _run([_find_quarto(), "render", "dashboard/dashboard.qmd"])
     _run([_find_rscript(), "dashboard/make_preview.R"])

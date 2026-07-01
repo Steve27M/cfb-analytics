@@ -316,6 +316,33 @@ ggplot(bw, aes(week, brier, colour = source)) +
        x = "Week", y = "Brier score")
 ```
 
+## Forecasting a new season before it starts
+
+The in-season model needs a few weeks of *this year's* results. To predict **openers** — or a whole
+schedule the day it drops — a **preseason priors model** uses only *last season's* carryover (SP+
+rating, net EPA, win rate). It's genuinely useful, but the table below quantifies the honest cost of
+having no current-year form: preseason forecasts are meaningfully less certain. This is the model
+that would score a 2026 schedule the moment it's loaded.
+
+```{r priors-vs-inseason}
+prio <- result("metrics__priors__r.csv")
+game <- result("metrics__game__r.csv") |> filter(language == "r")
+pick <- function(d, m) d |> filter(metric == m) |> pull(value) |> first()
+
+tibble(
+  Metric = c("Brier (lower better)", "AUC (higher better)", "Accuracy"),
+  `In-season model` = c(pick(game, "brier"), pick(game, "auc"), pick(game, "accuracy")),
+  `Preseason priors` = c(pick(prio, "brier"), pick(prio, "auc"), pick(prio, "accuracy")),
+  `Naive baseline` = c(pick(prio, "brier_naive"), NA, NA)
+) |>
+  gt() |>
+  tab_header(title = "In-season vs preseason forecasting (2025 holdout)",
+             subtitle = "Preseason (prior-year priors only) beats a naive guess but trails the in-season model") |>
+  fmt_number(columns = c(`In-season model`, `Preseason priors`, `Naive baseline`), decimals = 3) |>
+  sub_missing(missing_text = "—") |>
+  tab_options(table.font.size = px(12))
+```
+
 ## Model coefficients & fit (M3–M5)
 
 ```{r model-metrics}

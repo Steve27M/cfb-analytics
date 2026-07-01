@@ -52,8 +52,10 @@ efficiency is mostly noise (ICC ≈ 1%), so small-sample rushers are pooled towa
 | M8 | Web scraping (Ch 7) | Recruiting rank vs on-field production — *do teams beat their recruiting?* |
 
 Each method is implemented in **R and Python**, with an R↔Python parity check surfaced on the
-dashboard. A game-level **win-probability / spread** model consumes these features and is
-benchmarked against the CFBD betting line.
+dashboard. A game-level **win-probability** model consumes these features and is benchmarked against
+the CFBD betting line; a companion **preseason priors model** forecasts games from prior-season
+carryover alone (so a new season's schedule can be scored before any current-year form exists —
+honestly less certain, and the dashboard quantifies the gap).
 
 ## Data source & terms (§9 pre-flight)
 
