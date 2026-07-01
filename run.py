@@ -141,8 +141,10 @@ def parity() -> None:
 
 @app.command()
 def dashboard() -> None:
-    """Render the Quarto dashboard to docs/."""
+    """Prepare feeds (Python/DuckDB), render Quarto to docs/, refresh committed preview PNGs."""
+    _run(["uv", "run", "python", "dashboard/prepare_dashboard_data.py"])
     _run([_find_quarto(), "render", "dashboard/dashboard.qmd"])
+    _run([_find_rscript(), "dashboard/make_preview.R"])
 
 
 @app.callback(invoke_without_command=True)

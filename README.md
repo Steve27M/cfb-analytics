@@ -11,8 +11,20 @@ Python (`uv`, `dbt-duckdb`, `statsmodels`, `scikit-learn`) · DuckDB · dbt · Q
 Orchestrated by a Python CLI that runs the R models as subprocess steps — **the data
 (DuckDB tables + a metrics JSON) is the contract between languages**, not in-memory objects.
 
-> **Status:** scaffolding. See [`PROJECT_PLAN.md`](PROJECT_PLAN.md) for the full design,
-> phased task list, and verification plan.
+> **Status:** pipeline live end-to-end for 2023–24 FBS. Medallion + Kimball star build green
+> (112 dbt tests, SCD2 `dim_team` capturing the 2024 realignment); the book models **M1–M5** and
+> the game win-probability model run in **R and Python** with a committed **22/22 coefficient
+> parity** gate; the Quarto dashboard renders. See [`PROJECT_PLAN.md`](PROJECT_PLAN.md) for the
+> full design and phased plan. Next: M6–M7 + play-level EPA (Phase 5).
+
+## Dashboard preview
+
+The game win-probability model, trained on 2023 and evaluated on the **sealed 2024 holdout**,
+approaches the betting market using only on-field efficiency — **Brier 0.195, AUC 0.76, 70%
+accuracy** vs a home-field-naive baseline (0.243) and the market line (0.183).
+
+![Brier score by week — model vs market](docs/preview_brier_by_week.png)
+![Win-probability calibration (2024 holdout)](docs/preview_calibration.png)
 
 ## Modeling (grounded in the book)
 

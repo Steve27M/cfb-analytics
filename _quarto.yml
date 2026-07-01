@@ -1,0 +1,7 @@
+# Quarto project for the cfb-analytics dashboard. Rendered from the repo root so the R chunks
+# read the warehouse exports at data/*; output lands in docs/ (HTML gitignored — it embeds data).
+project:
+  output-dir: docs
+  execute-dir: project
+  render:
+    - dashboard/dashboard.qmd

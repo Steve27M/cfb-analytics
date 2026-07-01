@@ -20,9 +20,13 @@ artifacts/metrics.json
 !artifacts/.gitkeep
 
 # --- Dashboard build output (embeds data → do not publish HTML) ---
-docs/*.html
-dashboard/*.html
-dashboard/*_files/
+docs/**/*.html
+docs/**/*_files/
+dashboard/**/*.html
+dashboard/**/*_files/
+.quarto/
+# derived dashboard feeds (Python writes these from the warehouse at render time)
+data/dashboard/
 
 # --- Python ---
 .venv/
@@ -51,3 +55,6 @@ logs/
 Thumbs.db
 .vscode/
 .idea/
+
+/.quarto/
+**/*.quarto_ipynb

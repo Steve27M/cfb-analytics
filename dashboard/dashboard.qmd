@@ -1,0 +1,311 @@
+---
+title: "CFB Analytics — Data & Model Evaluation"
+subtitle: "A polyglot college-football pipeline · CFBD → DuckDB → dbt → R + Python models"
+date: today
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-depth: 2
+    toc-location: left
+    embed-resources: true
+    fig-width: 8
+    fig-height: 4.5
+    df-print: kable
+    code-fold: true
+    code-summary: "Show code"
+engine: knitr
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+```{r setup}
+library(readr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(gt)
+library(scales)
+
+# Rendered from the repo root (execute-dir: project). R reads the warehouse exports as flat
+# files — Python owns DuckDB; this is the polyglot contract, not a workaround.
+gold    <- function(f) read_csv(file.path("data", "gold", f), show_col_types = FALSE)
+result  <- function(f) read_csv(file.path("data", "results", f), show_col_types = FALSE)
+dash    <- function(f) read_csv(file.path("data", "dashboard", f), show_col_types = FALSE)
+
+theme_set(theme_minimal(base_size = 12))
+PAL <- c(r = "#2C7FB8", py = "#D95F0E", model = "#2C7FB8", market = "#D95F0E")
+SEASON <- 2024  # headline season for the leaderboards
+```
+
+> **Data:** [CollegeFootballData.com](https://collegefootballdata.com) (CFBD API, free tier).
+> Raw data is gitignored and collected within the API's bounded/cached terms. This page evaluates
+> **(1) the data** and **(2) the models' accuracy**. Every statistical method is implemented in
+> **both R and Python** against the same warehouse feed; their agreement is a built-in correctness
+> check (see *R ↔ Python parity*).
+
+# Part 1 — Evaluating the data
+
+## Data-quality panel
+
+```{r dq-panel}
+counts <- dash("dq_layer_counts.csv")
+tests  <- dash("dq_tests.csv")
+fresh  <- dash("dq_freshness.csv")
+
+n_pass <- tests |> filter(status == "pass") |> pull(n) |> sum()
+n_fail <- tests |> filter(status %in% c("fail", "error")) |> pull(n) |> sum()
+
+layer_summary <- counts |>
+  mutate(layer = factor(layer, levels = c("staging", "silver", "gold", "snapshots"))) |>
+  group_by(layer) |>
+  summarise(tables = n(), rows = sum(row_count), .groups = "drop")
+
+layer_summary |>
+  gt() |>
+  tab_header(
+    title = "Medallion warehouse",
+    subtitle = sprintf("dbt data tests: %d passed, %d failed · sources fresh as of %s",
+                       n_pass, n_fail, format(max(fresh$last_loaded), "%Y-%m-%d"))
+  ) |>
+  fmt_integer(columns = c(tables, rows)) |>
+  cols_label(layer = "Layer", tables = "Tables", rows = "Rows") |>
+  data_color(columns = layer, palette = "Blues", alpha = 0.4) |>
+  tab_options(table.font.size = px(13))
+```
+
+```{r dq-freshness}
+fresh |>
+  arrange(desc(rows)) |>
+  gt() |>
+  tab_header(title = "Bronze sources — load lineage") |>
+  fmt_integer(columns = rows) |>
+  cols_label(source = "Source", last_loaded = "Last loaded", rows = "Rows") |>
+  tab_options(table.font.size = px(12))
+```
+
+## Team efficiency leaderboard
+
+Opponent-context offensive/defensive **EPA per play** (lower defensive EPA = better), season average.
+
+```{r team-eff}
+te <- dash("team_efficiency.csv") |> filter(season == SEASON)
+
+te |>
+  arrange(desc(net_epa)) |>
+  slice_head(n = 12) |>
+  transmute(Team = team, `W%` = win_pct, `Net EPA` = net_epa,
+            `Off EPA` = off_epa, `Def EPA` = def_epa) |>
+  gt() |>
+  tab_header(title = sprintf("Top teams by net EPA/play — %d", SEASON)) |>
+  fmt_percent(columns = `W%`, decimals = 0) |>
+  fmt_number(columns = c(`Net EPA`, `Off EPA`, `Def EPA`), decimals = 3) |>
+  data_color(columns = `Net EPA`, palette = "Greens") |>
+  tab_source_note("Net EPA = offensive EPA/play − defensive EPA/play allowed.") |>
+  tab_options(table.font.size = px(12))
+```
+
+## "Over expected" leaderboards (M2–M4)
+
+The book's residual framework: model the *expected* outcome from game situation; the residual is
+skill. **RYOE** (rushing yards over expected, M3) and **CPOE** (completion % over expected, M4).
+
+```{r ryoe-cpoe}
+plays <- gold("plays_model.csv") |>
+  select(play_key, season, rusher_player_name, passer_player_name, offense_team)
+
+ryoe_lb <- result("pred__ryoe__r.csv") |>
+  inner_join(plays, by = "play_key") |>
+  filter(season == SEASON, !is.na(rusher_player_name)) |>
+  group_by(Player = rusher_player_name, Team = offense_team) |>
+  summarise(Carries = n(), `RYOE/att` = mean(ryoe), .groups = "drop") |>
+  filter(Carries >= 100) |>
+  arrange(desc(`RYOE/att`)) |>
+  slice_head(n = 10)
+
+cpoe_lb <- result("pred__cpoe__r.csv") |>
+  inner_join(plays, by = "play_key") |>
+  filter(season == SEASON, !is.na(passer_player_name)) |>
+  group_by(Player = passer_player_name, Team = offense_team) |>
+  summarise(Attempts = n(), `CPOE` = mean(cpoe), .groups = "drop") |>
+  filter(Attempts >= 200) |>
+  arrange(desc(`CPOE`)) |>
+  slice_head(n = 10)
+
+gt(ryoe_lb) |>
+  tab_header(title = "Rushing Yards Over Expected", subtitle = sprintf("%d · ≥100 carries", SEASON)) |>
+  fmt_number(columns = `RYOE/att`, decimals = 2) |>
+  data_color(columns = `RYOE/att`, palette = "Blues") |>
+  tab_options(table.font.size = px(12))
+```
+
+```{r cpoe-lb}
+gt(cpoe_lb) |>
+  tab_header(title = "Completion % Over Expected", subtitle = sprintf("%d · ≥200 attempts", SEASON)) |>
+  fmt_percent(columns = CPOE, decimals = 1) |>
+  data_color(columns = CPOE, palette = "Blues") |>
+  tab_options(table.font.size = px(12))
+```
+
+## Metric stability (M1) — is it skill or noise?
+
+Split-half reliability (odd vs even plays) of rushing yards-per-carry. A tight diagonal = a
+reliable, skill-driven metric; a loose cloud = mostly noise (and a candidate for shrinkage, M7).
+
+```{r stability-plot}
+pr <- gold("player_rushing.csv") |>
+  filter(season == SEASON, attempts_odd >= 40, attempts_even >= 40)
+
+r_split <- cor(pr$ypc_odd_plays, pr$ypc_even_plays, use = "complete.obs")
+
+ggplot(pr, aes(ypc_odd_plays, ypc_even_plays)) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", colour = "grey60") +
+  geom_point(alpha = 0.5, colour = PAL["model"], size = 1.8) +
+  geom_smooth(method = "lm", se = FALSE, colour = PAL["market"], linewidth = 0.8) +
+  labs(
+    title = sprintf("Rushing YPC split-half reliability, %d  (r = %.2f)", SEASON, r_split),
+    subtitle = "Each point = a rusher (≥40 carries in each half). Loose spread ⇒ YPC is noisy.",
+    x = "Yards/carry — odd plays", y = "Yards/carry — even plays") +
+  coord_equal()
+```
+
+```{r stability-table}
+bind_rows(result("metrics__stability__r.csv"), result("metrics__stability__py.csv")) |>
+  filter(metric %in% c("split_half_reliability_ypc", "year_over_year_r_ypc")) |>
+  mutate(metric = recode(metric,
+                         split_half_reliability_ypc = "Split-half reliability (Spearman-Brown)",
+                         year_over_year_r_ypc = "Year-over-year r")) |>
+  select(metric, basis, n, value, language) |>
+  pivot_wider(names_from = language, values_from = value) |>
+  gt() |>
+  tab_header(title = "Reliability of rushing YPC", subtitle = "R and Python agree") |>
+  fmt_number(columns = c(r, py), decimals = 3) |>
+  cols_label(metric = "Metric", basis = "Season(s)", n = "n",
+             r = "R", py = "Python") |>
+  tab_options(table.font.size = px(12))
+```
+
+# Part 2 — Evaluating the models
+
+## The game win-probability model
+
+Logistic model of P(home win) from leakage-safe entering-form efficiency differentials. Trained on
+2023, evaluated on the **sealed 2024 holdout** against a home-field-naive baseline and the
+**betting market** (the bar to clear).
+
+```{r game-metrics}
+gm <- bind_rows(result("metrics__game__r.csv"), result("metrics__game__py.csv")) |>
+  filter(language == "r")
+val <- function(m) gm |> filter(metric == m) |> pull(value) |> first()
+
+tibble(
+  Metric = c("Brier score", "Log loss", "AUC", "Accuracy"),
+  Model  = c(val("brier"), val("log_loss"), val("auc"), val("accuracy")),
+  `Market line` = c(val("brier_market_line"), NA, NA, val("accuracy_market_line")),
+  `Naive (home-field)` = c(val("brier_naive_homefield"), NA, NA, NA)
+) |>
+  gt() |>
+  tab_header(title = "2024 holdout accuracy",
+             subtitle = "Lower Brier/log-loss = better; the model approaches the market using on-field efficiency only") |>
+  fmt_number(columns = c(Model, `Market line`, `Naive (home-field)`), decimals = 3) |>
+  sub_missing(missing_text = "—") |>
+  tab_options(table.font.size = px(12))
+```
+
+```{r calibration}
+gp <- result("gamepred__game__r.csv")
+
+calib <- gp |>
+  mutate(bin = cut(home_win_prob, breaks = seq(0, 1, 0.1), include.lowest = TRUE)) |>
+  group_by(bin) |>
+  summarise(pred = mean(home_win_prob), obs = mean(home_won), n = n(), .groups = "drop")
+
+ggplot(calib, aes(pred, obs)) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", colour = "grey60") +
+  geom_line(colour = PAL["model"], linewidth = 0.8) +
+  geom_point(aes(size = n), colour = PAL["model"]) +
+  scale_size_area(max_size = 8, guide = "none") +
+  scale_x_continuous(labels = percent, limits = c(0, 1)) +
+  scale_y_continuous(labels = percent, limits = c(0, 1)) +
+  labs(title = "Calibration — predicted vs observed home-win rate (2024 holdout)",
+       subtitle = "On the diagonal = well-calibrated probabilities. Point size = games in bin.",
+       x = "Predicted P(home win)", y = "Observed home-win rate") +
+  coord_equal()
+```
+
+```{r brier-by-week}
+bw <- gp |>
+  group_by(week) |>
+  summarise(Model = mean((home_won - home_win_prob)^2),
+            Market = mean((home_won - market_win_prob)^2),
+            n = n(), .groups = "drop") |>
+  pivot_longer(c(Model, Market), names_to = "source", values_to = "brier")
+
+ggplot(bw, aes(week, brier, colour = source)) +
+  geom_line(linewidth = 0.8) +
+  geom_point(size = 1.8) +
+  scale_colour_manual(values = c(Model = unname(PAL["model"]), Market = unname(PAL["market"])),
+                      name = NULL) +
+  labs(title = "Brier score by week — model vs betting market (2024)",
+       subtitle = "The market is hard to beat; the efficiency model tracks it closely.",
+       x = "Week", y = "Brier score")
+```
+
+## Model coefficients & fit (M3–M5)
+
+```{r model-metrics}
+mt <- bind_rows(
+  result("metrics__ryoe__r.csv"), result("metrics__cpoe__r.csv"),
+  result("metrics__poisson__r.csv"))
+
+mt |>
+  filter(metric %in% c("rmse", "r_squared", "brier", "brier_baseline",
+                        "log_loss", "dispersion", "aic_poisson")) |>
+  mutate(value = round(value, 4)) |>
+  select(Model = model, Metric = metric, Value = value) |>
+  gt() |>
+  tab_header(title = "Headline fit metrics by model") |>
+  tab_options(table.font.size = px(12)) |>
+  data_color(columns = Model, palette = "Pastel1", alpha = 0.5)
+```
+
+## R ↔ Python parity — the built-in correctness check
+
+Every method is fit independently in R and Python on the identical feed. Because the fits are
+mathematically the same (OLS, IRLS GLM, Poisson, logistic MLE), the coefficients **must** agree.
+The pipeline's `load_results` step fails the build if any term diverges beyond tolerance.
+
+```{r parity}
+coef_r  <- bind_rows(lapply(
+  list.files("data/results", pattern = "^coef__.*__r\\.csv$", full.names = TRUE),
+  read_csv, show_col_types = FALSE)) |> select(model, term, estimate_r = estimate)
+coef_py <- bind_rows(lapply(
+  list.files("data/results", pattern = "^coef__.*__py\\.csv$", full.names = TRUE),
+  read_csv, show_col_types = FALSE)) |> select(model, term, estimate_py = estimate)
+
+parity <- inner_join(coef_r, coef_py, by = c("model", "term")) |>
+  mutate(`|Δ|` = abs(estimate_r - estimate_py))
+
+max_diff <- max(parity$`|Δ|`)
+
+parity |>
+  arrange(desc(`|Δ|`)) |>
+  slice_head(n = 12) |>
+  gt() |>
+  tab_header(title = "R vs Python coefficient agreement",
+             subtitle = sprintf("%d coefficients across %d models · max |Δ| = %.2e",
+                                nrow(parity), n_distinct(parity$model), max_diff)) |>
+  fmt_number(columns = c(estimate_r, estimate_py), decimals = 4) |>
+  fmt_scientific(columns = `|Δ|`, decimals = 1) |>
+  cols_label(model = "Model", term = "Term", estimate_r = "R", estimate_py = "Python") |>
+  data_color(columns = `|Δ|`, palette = c("#1A9850", "#1A9850")) |>
+  tab_options(table.font.size = px(12))
+```
+
+---
+
+*Built with R (`gt`, `ggplot2`), Python (`duckdb`, `pandas`), dbt, and DuckDB. Models from
+Eager & Erickson, *Football Analytics with Python & R*, applied to CFB. Data:
+CollegeFootballData.com.*
