@@ -17,11 +17,11 @@ Orchestrated by a Python CLI that runs the R models as subprocess steps — **th
 (DuckDB tables + a metrics JSON) is the contract between languages**, not in-memory objects.
 
 > **Status:** pipeline live end-to-end for 2023–24 FBS. Medallion + Kimball star build green
-> (112 dbt tests, SCD2 `dim_team` capturing the 2024 realignment); the book models **M1–M7** and
+> (119 dbt tests, SCD2 `dim_team` capturing the 2024 realignment); the book models **M1–M8** and
 > the game win-probability model run in **R and Python** with a committed **R↔Python parity** gate
 > (coefficients agree to tolerance; PCA/cluster/mixed-effects agree label-invariantly); the Quarto
-> dashboard renders. See [`PROJECT_PLAN.md`](PROJECT_PLAN.md) for the full design and phased plan.
-> Next: play-level EPA + optional M8 scraping, then polish (Phase 5–6).
+> dashboard is [**live on Pages**](https://steve27m.github.io/cfb-analytics/). See
+> [`PROJECT_PLAN.md`](PROJECT_PLAN.md) for the full design and phased plan.
 
 ## Dashboard preview
 
@@ -49,7 +49,7 @@ efficiency is mostly noise (ICC ≈ 1%), so small-sample rushers are pooled towa
 | M5 | Poisson regression (Ch 6) | Passing-TD counts → betting-prop framing |
 | M6 | PCA + clustering (Ch 8) | Team/player archetypes |
 | M7 | Multilevel / mixed-effects (Ch 9) | Shrinkage / regression-to-the-mean |
-| M8 | Web scraping (Ch 7, optional) | Recruiting rank vs on-field production |
+| M8 | Web scraping (Ch 7) | Recruiting rank vs on-field production — *do teams beat their recruiting?* |
 
 Each method is implemented in **R and Python**, with an R↔Python parity check surfaced on the
 dashboard. A game-level **win-probability / spread** model consumes these features and is
@@ -147,14 +147,24 @@ from-scratch expected-points model**: it would duplicate the warehouse's already
 next-score labels reconstructed from the available start-of-play scores validate at only ~91% vs the
 final scores — shipping a worse model to pad the method list would be the wrong call.
 
-**What it demonstrates:** end-to-end ELT (API → medallion → Kimball star), analytics-engineering
+**Scraping with a conscience (M8).** The recruiting model needed data no API cleanly gave us, so
+it scrapes — but only after a **source pre-flight**: the major recruiting sites were *rejected*
+(their ToS forbid automated extraction and their pages carry individual, often-minor recruits'
+data), and **Wikipedia** was chosen instead (CC BY-SA, robots.txt welcomes low-speed bots). The
+scraper takes **only the team-level rankings table**, identifies itself with a descriptive
+User-Agent, rate-limits, and caches so a page is never re-fetched — and the scraped numbers were
+**validated to match CFBD's sanctioned API exactly**. The finding is fun and face-valid: Michigan's
+2023 national title team and Florida State's 2024 collapse are the standout over- and
+under-achievers relative to the talent they signed.
+
+**What it demonstrates:** end-to-end ELT (API + ethical scrape → medallion → Kimball star), analytics-engineering
 rigor (grain declarations, SCD2, freshness/volume tests, idempotency), a real ML workflow (leakage-
 safe time-aware validation, sealed holdout, beat-a-baseline, calibration), and genuine polyglot
 range — R, Python, and SQL each doing what they're best at, cross-checked against each other.
 
 ## Roadmap
 
-Done: ingestion → medallion → Kimball star + SCD2 → book models M1–M7 (R + Python) → game
-win-probability model → Quarto dashboard. Deferred but pre-structured: optional **M8** recruiting-vs-
-production scrape (needs its own source terms review), GitHub Actions **CI** (lint + `dbt build`),
-and a **BigQuery** push of the gold tables. See [`PROJECT_PLAN.md`](PROJECT_PLAN.md) for the full plan.
+Done: ingestion (API + ethical scrape) → medallion → Kimball star + SCD2 → book models **M1–M8**
+(R + Python) → game win-probability model → Quarto dashboard live on GitHub Pages. Deferred but
+pre-structured: GitHub Actions **CI** (lint + `dbt build`) and a **BigQuery** push of the gold
+tables. See [`PROJECT_PLAN.md`](PROJECT_PLAN.md) for the full plan.

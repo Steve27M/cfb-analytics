@@ -75,9 +75,10 @@ def _dbt(*args: str) -> list[str]:
 
 @app.command()
 def ingest(season: str = typer.Option(None, help="Override CFB_SEASONS, e.g. '2024'.")) -> None:
-    """CFBD -> DuckDB bronze CSVs (quota-aware, cached)."""
+    """CFBD API + ethical Wikipedia recruiting scrape -> bronze CSVs (quota-aware, cached)."""
     env = {"CFB_SEASONS": season} if season else {}
     _run([_find_rscript(), "ingest/ingest_cfbd.R"], env=env)
+    _run([_find_rscript(), "ingest/scrape_recruiting.R"], env=env)
 
 
 @app.command()
@@ -120,6 +121,7 @@ def models() -> None:
         "analysis/R/poisson.R",         # M5 passing-TD Poisson
         "analysis/R/archetypes.R",      # M6 PCA + k-means archetypes
         "analysis/R/shrinkage.R",       # M7 multilevel shrinkage
+        "analysis/R/recruiting.R",      # M8 recruiting vs production
         "analysis/R/game_model_train.R",  # game win-prob model (tidymodels) — phase 3b
         "analysis/R/game_model_score.R",
     ]
@@ -134,7 +136,8 @@ def models() -> None:
 @app.command()
 def parity() -> None:
     """Run the Python parity fits, then load all results to gold with the R<->Python parity gate."""
-    for s in ["stability", "ryoe", "cpoe", "poisson", "archetypes", "shrinkage", "game_model"]:
+    for s in ["stability", "ryoe", "cpoe", "poisson", "archetypes", "shrinkage",
+              "recruiting", "game_model"]:
         script = f"analysis/python/{s}.py"
         if (REPO_ROOT / script).exists():
             _run(["uv", "run", "python", script])

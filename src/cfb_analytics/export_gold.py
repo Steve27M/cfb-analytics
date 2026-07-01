@@ -188,6 +188,32 @@ FEEDS: dict[str, str] = {
         group by down, yards_to_goal
         having count(*) >= 20
     """,
+    # M8: recruiting rank (scraped) vs on-field production. One row per top-25-recruiting
+    # team-season, with that season's SP+ rating and win rate — the inputs for "do teams beat
+    # their recruiting?" (production regressed on recruiting rank; the residual is over/under-
+    # performance).
+    "recruiting_production": """
+        with wins as (
+            select team, season,
+                   avg(case when won then 1.0 else 0.0 end) as win_pct,
+                   count(*) as games
+            from gold.fct_team_game
+            where team_sk <> '-1'
+            group by team, season
+        )
+        select
+            r.team,
+            r.season,
+            r.recruiting_rank_247,
+            r.recruiting_rank_rivals,
+            r.recruiting_rank_on3,
+            s.sp_rating,
+            w.win_pct
+        from staging.stg_wiki__recruiting r
+        left join silver.silver_ratings_sp s on r.team = s.team and r.season = s.season
+        join wins w on r.team = w.team and r.season = w.season
+        where s.sp_rating is not null
+    """,
 }
 
 

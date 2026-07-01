@@ -102,3 +102,23 @@ models:
         data_tests: [not_null]
       - name: week
         data_tests: [not_null]
+
+  - name: stg_wiki__recruiting
+    description: >
+      One row per team per season (team + season). Team recruiting-class rankings scraped from
+      Wikipedia (247/Rivals/On3), team names conformed to the warehouse. Feeds the M8
+      recruiting-vs-production analysis.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [team, season]
+    columns:
+      - name: team
+        data_tests: [not_null]
+      - name: season
+        data_tests:
+          - not_null
+          - accepted_values: { values: [2023, 2024], quote: false }
+      - name: recruiting_rank_247
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range: { min_value: 1, max_value: 40 }

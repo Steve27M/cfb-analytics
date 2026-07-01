@@ -67,4 +67,21 @@ p_sh <- ggplot(sh, aes(carries, ryoe, colour = estimate)) +
 ggsave(file.path("docs", "preview_shrinkage.png"), p_sh,
        width = 9, height = 5, dpi = 150, bg = "white")
 
-cat("wrote docs/preview_{calibration,brier_by_week,shrinkage}.png\n")
+# 4. M8 recruiting vs production — who beats their recruiting (ethically-scraped rankings)
+rec <- readr::read_csv(file.path("data", "results", "pred__recruiting__r.csv"),
+                       show_col_types = FALSE)
+ext <- dplyr::bind_rows(dplyr::slice_max(rec, performance_vs_recruiting, n = 3),
+                        dplyr::slice_min(rec, performance_vs_recruiting, n = 3))
+p_rec <- ggplot(rec, aes(recruiting_rank_247, sp_rating)) +
+  geom_smooth(method = "lm", se = FALSE, colour = "grey55", linewidth = 0.8) +
+  geom_point(aes(colour = performance_vs_recruiting), size = 2.6) +
+  geom_text(data = ext, aes(label = paste0(team, " '", substr(season, 3, 4))),
+            size = 3, vjust = -0.9) +
+  scale_colour_gradient2(low = "#B2182B", mid = "grey80", high = "#2166AC", name = "Over /\nunder") +
+  labs(title = "On-field production vs recruiting rank (top-25 classes, 2023-24)",
+       subtitle = "Above line = beat recruiting; below = underachieved.",
+       x = "Recruiting-class rank (1 = best)", y = "SP+ rating", caption = ATTRIB)
+ggsave(file.path("docs", "preview_recruiting.png"), p_rec,
+       width = 9, height = 5.5, dpi = 150, bg = "white")
+
+cat("wrote docs/preview_{calibration,brier_by_week,shrinkage,recruiting}.png\n")

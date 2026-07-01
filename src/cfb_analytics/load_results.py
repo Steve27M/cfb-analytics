@@ -49,6 +49,7 @@ def load() -> None:
     game_preds = _read_glob("gamepred__*.csv")      # game-grain win-prob predictions
     archetypes = _read_glob("pred__archetype__*.csv")   # team-season PC coords + cluster (M6)
     shrinkage = _read_glob("pred__shrinkage__*.csv")    # per-rusher raw vs shrunk RYOE (M7)
+    recruiting = _read_glob("pred__recruiting__*.csv")  # team-season production vs recruiting (M8)
     if coef.empty:
         raise SystemExit("no results found in data/results — run the R/Python models first")
 
@@ -64,6 +65,7 @@ def load() -> None:
             ("game_predictions", game_preds),
             ("team_archetypes", archetypes),
             ("player_shrinkage", shrinkage),
+            ("recruiting_performance", recruiting),
             ("model_parity", parity),
         ]:
             if df.empty:

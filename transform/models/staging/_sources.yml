@@ -25,6 +25,11 @@ sources:
         description: Team metadata — conference, division, venue (cfbd_team_info).
       - name: calendar
         description: Season calendar — weeks & dates (cfbd_calendar).
+      - name: recruiting
+        description: >
+          TEAM-level recruiting-class rankings (247Sports / Rivals / On3), scraped ethically from
+          Wikipedia's CC BY-SA "Top ranked classes" tables (ingest/scrape_recruiting.R). Top ~25
+          teams per season; individual-recruit data is deliberately NOT collected.
       - name: ingest_log
         description: One row per ingestion event (table, season, rows, source, pull_id).
         freshness: null

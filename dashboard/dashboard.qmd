@@ -361,6 +361,44 @@ Only **`r sprintf("%.1f%%", 100 * icc)`** of RYOE variance is *between* rushers 
 correlation) — the rest is play-to-play noise. That tiny ICC is exactly why the pooling is so
 aggressive, and it quantitatively confirms the M1 stability finding.
 
+## Do teams beat their recruiting? (M8)
+
+Recruiting rankings here were collected by **ethically scraping Wikipedia** (CC BY-SA, bot-friendly)
+— only the *team-level* ranking table, never individual (often minor) recruits — and were validated
+to match CFBD's sanctioned recruiting API exactly. Regressing each team's on-field production (SP+
+rating) on its recruiting-class rank shows the expected relationship (better classes → better teams),
+but the **residuals** are the story: who out- or under-performed the talent they signed.
+
+```{r recruiting}
+rec <- result("pred__recruiting__r.csv")
+extremes <- bind_rows(slice_max(rec, performance_vs_recruiting, n = 3),
+                      slice_min(rec, performance_vs_recruiting, n = 3))
+
+ggplot(rec, aes(recruiting_rank_247, sp_rating)) +
+  geom_smooth(method = "lm", se = FALSE, colour = "grey55", linewidth = 0.8) +
+  geom_point(aes(colour = performance_vs_recruiting), size = 2.6) +
+  geom_text(data = extremes, aes(label = paste0(team, " '", substr(season, 3, 4))),
+            size = 3, vjust = -0.9, colour = "black") +
+  scale_colour_gradient2(low = "#B2182B", mid = "grey80", high = "#2166AC",
+                         name = "Over /\nunder") +
+  labs(title = "On-field production vs recruiting-class rank (top-25 classes, 2023–24)",
+       subtitle = "Above the line = beating their recruiting; below = underachieving.",
+       x = "Recruiting-class rank (1 = best)", y = "SP+ rating (higher = better)")
+```
+
+```{r recruiting-table}
+rec |>
+  slice_max(performance_vs_recruiting, n = 6) |>
+  transmute(Team = team, Season = season, `Recruit rank` = recruiting_rank_247,
+            `SP+` = sp_rating, `Beat recruiting by` = performance_vs_recruiting) |>
+  gt() |>
+  tab_header(title = "Biggest overachievers vs recruiting",
+             subtitle = "Production well above what their signed talent predicted") |>
+  fmt_number(columns = c(`SP+`, `Beat recruiting by`), decimals = 1) |>
+  data_color(columns = `Beat recruiting by`, palette = "Blues") |>
+  tab_options(table.font.size = px(12))
+```
+
 ## R ↔ Python parity — the built-in correctness check
 
 Every method is fit independently in R and Python on the identical feed. Because the fits are
