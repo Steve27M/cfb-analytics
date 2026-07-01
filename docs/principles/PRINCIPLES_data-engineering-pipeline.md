@@ -1,7 +1,7 @@
 # DE Pipeline Principles — a working checklist
 
 A digest of practices distilled from the reference library, grouped by concern.
-This is the *why* behind the non-negotiables in CLAUDE.md. Treat each `[ ]` as a
+This is the *why* behind the repo's non-negotiables. Treat each `[ ]` as a
 check to clear, not prose to admire. Citations are by chapter/section so you can
 go read the source.
 

@@ -343,30 +343,6 @@ tibble(
   tab_options(table.font.size = px(12))
 ```
 
-### 2026 season — live preseason forecast
-
-Applying the priors model to the **2026 schedule** (pulled from CFBD, not yet played) using each
-team's 2025 carryover. These are *preseason* probabilities — useful but deliberately humble (see the
-accuracy gap above). Below: the week-1 openers the model sees as near coin-flips (where it's least
-sure), and its most confident picks.
-
-```{r forecast-2026}
-fpath <- file.path("data", "gold", "forecast_2026.csv")
-if (file.exists(fpath)) {
-  fc <- readr::read_csv(fpath, show_col_types = FALSE) |> filter(week == 1)
-  toss <- fc |> mutate(edge = abs(home_win_prob - 0.5)) |> slice_min(edge, n = 8) |>
-    transmute(Matchup = paste(away_team, "@", home_team),
-              `Home win prob` = home_win_prob, Lean = favored_team)
-  gt(toss) |>
-    tab_header(title = "2026 week 1 — the model's closest calls",
-               subtitle = "Preseason priors only; ~50% = genuine toss-up") |>
-    fmt_percent(columns = `Home win prob`, decimals = 0) |>
-    tab_options(table.font.size = px(12))
-} else {
-  cat("_Run `uv run python -m cfb_analytics.forecast 2026` to populate 2026 forecasts._")
-}
-```
-
 ## Model coefficients & fit (M3–M5)
 
 ```{r model-metrics}
@@ -453,6 +429,99 @@ rec |>
   fmt_number(columns = c(`SP+`, `Beat recruiting by`), decimals = 1) |>
   data_color(columns = `Beat recruiting by`, palette = "Blues") |>
   tab_options(table.font.size = px(12))
+```
+
+# Part 3 — 2026 season outlook (a live forecast)
+
+Everything above measures the past; this looks **forward**. Taking the real **2026 schedule** (pulled
+from CFBD, none of it played yet) and each team's 2025 carryover, the preseason priors model scores
+every game, and the per-game probabilities add up to a **projected win total** for each team. Read
+this as an informed *prior*, not a prophecy: it knows how teams finished 2025 and who they play in
+2026, but not transfers, coaching changes, or breakout freshmen — and preseason forecasts are the
+least certain kind (the accuracy table above quantifies that).
+
+```{r forecast-load}
+have_forecast <- file.exists(file.path("data", "gold", "forecast_2026.csv")) &&
+  file.exists(file.path("data", "gold", "forecast_2026_teams.csv"))
+```
+
+## Projected 2026 win totals
+
+Expected wins summed over each team's **FBS-vs-FBS** games (cupcake FCS games excluded, so most
+teams' real totals run ~1 higher). It blends *team quality* and *schedule*: a strong team with a soft
+slate projects high; a good team in a brutal division less so.
+
+```{r projected-wins}
+#| eval: !expr have_forecast
+teams <- readr::read_csv(file.path("data", "gold", "forecast_2026_teams.csv"),
+                         show_col_types = FALSE)
+
+top20 <- teams |> slice_head(n = 20)
+ggplot(top20, aes(x = projected_wins, y = reorder(team, projected_wins))) +
+  geom_col(fill = PAL["model"], alpha = 0.85) +
+  geom_text(aes(label = sprintf("%.1f", projected_wins)), hjust = -0.15, size = 3) +
+  scale_x_continuous(expand = expansion(mult = c(0, 0.08))) +
+  labs(title = "Projected 2026 win totals — top 20 (FBS-vs-FBS games only)",
+       subtitle = "Expected wins = sum of the model's per-game win probabilities.",
+       x = "Projected wins", y = NULL)
+```
+
+```{r projected-wins-table}
+#| eval: !expr have_forecast
+teams |>
+  slice_head(n = 25) |>
+  transmute(`#` = projected_rank, Team = team, `FBS games` = games,
+            `Proj. wins` = projected_wins, `Proj. losses` = projected_losses,
+            `Avg win prob` = avg_win_prob) |>
+  gt() |>
+  tab_header(title = "2026 projected win totals — top 25",
+             subtitle = "Preseason priors model applied to the real 2026 schedule") |>
+  fmt_number(columns = c(`Proj. wins`, `Proj. losses`), decimals = 1) |>
+  fmt_percent(columns = `Avg win prob`, decimals = 0) |>
+  data_color(columns = `Proj. wins`, palette = "Greens") |>
+  tab_options(table.font.size = px(12))
+```
+
+## Opening weekend (week 1)
+
+The model's closest calls — genuine toss-ups where it has little conviction — and the games it's most
+sure about.
+
+```{r week1-tossups}
+#| eval: !expr have_forecast
+fc1 <- readr::read_csv(file.path("data", "gold", "forecast_2026.csv"),
+                       show_col_types = FALSE) |> filter(week == 1)
+
+fc1 |>
+  mutate(edge = abs(home_win_prob - 0.5)) |>
+  slice_min(edge, n = 10) |>
+  transmute(Matchup = paste(away_team, "@", home_team),
+            `Home win prob` = home_win_prob, `Model leans` = favored_team) |>
+  gt() |>
+  tab_header(title = "Week 1 — the model's true toss-ups",
+             subtitle = "≈50% = a coin flip even to the model") |>
+  fmt_percent(columns = `Home win prob`, decimals = 0) |>
+  tab_options(table.font.size = px(12))
+```
+
+```{r week1-locks}
+#| eval: !expr have_forecast
+fc1 |>
+  slice_max(favored_win_prob, n = 8) |>
+  transmute(Matchup = paste(away_team, "@", home_team),
+            Favorite = favored_team, `Win prob` = favored_win_prob) |>
+  gt() |>
+  tab_header(title = "Week 1 — the model's most confident picks") |>
+  fmt_percent(columns = `Win prob`, decimals = 0) |>
+  data_color(columns = `Win prob`, palette = "Blues") |>
+  tab_options(table.font.size = px(12))
+```
+
+```{r no-forecast-note}
+#| eval: !expr (!have_forecast)
+#| output: asis
+cat("> _2026 forecast not generated. Run `uv run python -m cfb_analytics.forecast 2026`",
+    "then re-render._")
 ```
 
 ## R ↔ Python parity — the built-in correctness check

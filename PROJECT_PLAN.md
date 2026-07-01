@@ -165,47 +165,6 @@ coefficient/prediction parity as a built-in correctness check.
 
 ---
 
-## Template-kit composition (`project-templates`) — concrete merge strategy
-
-Compose **four** of the seven kits: `data-engineering-pipeline/` (ingestion + medallion
-spine), `analytics-engineering/` (dbt + SCD2 snapshots), `data-science-analysis/` (EDA +
-communicating findings — matches the book), `ml-project/` (model + honest eval). Each kit is
-designed to *be* a repo root (its own `CLAUDE.md`, `settings.json`, `guard.py`), so merging
-into one repo needs the following — verified against the kit contents:
-
-- **Hooks (the one real blocker):** all four ship `.claude/hooks/guard.py` at the *same path*
-  on the *same* `Bash|Edit|Write` matcher. Rename to `guard_de.py`, `guard_dbt.py`,
-  `guard_ds.py`, `guard_ml.py` and register **all four** under one `hooks.PreToolUse`. Their
-  regexes are complementary (union, not conflict); audit the AE `SELECT *`-in-mart check vs
-  the DE bronze-DDL check so they don't cross-fire on each other's files.
-- **`settings.json` (single merged file):** union `permissions.allow/ask/deny` with
-  **deny-wins** — preserve ml's `Read/Edit(data/test/**)` deny (sealed test set) and AE's
-  `profiles.yml` / `**/raw/**` denies. Register all four MCP servers (`de-tools`, `dbt-tools`,
-  `ds-tools`, `ml-tools` — names distinct, no collision) and the four renamed hooks.
-- **Skills / commands / agents — copy as-is, no collisions:** skills
-  `building-or-changing-a-pipeline-model`, `adding-or-changing-a-dbt-model`,
-  `running-an-analysis-or-eda`, `model-training`; commands `/pipeline-check`, `/model-check`,
-  `/analysis-check`, `/train-gate`; review agents `pipeline-reviewer`, `dbt-model-reviewer`,
-  `analysis-reviewer`, `eval-reviewer`. Keep the four MCP servers **separate** (fully-qualified
-  tool names don't collide even though `query_readonly` repeats in 3 and `check_leakage` has
-  two different signatures). Wire each server's placeholder DB connection to our DuckDB file
-  (read-only).
-- **One top-level `CLAUDE.md`:** the kits' `src/`/`models/` layouts mean different things, so
-  write a single `CLAUDE.md` for *this* repo's real polyglot stack + the **union of
-  Non-negotiables** (idempotent loads, immutable bronze, freshness/volume checks, DQ tests on
-  every model, sealed holdout, no leakage, seed=42 reproducibility, no PII/secrets in logs).
-  Keep the four `PRINCIPLES.md` as cited references under `docs/principles/`.
-- **R adaptation (no kit covers R):** extend `CLAUDE.md` with an R section — `renv` lockfile,
-  the `Rscript` subprocess data-contract, `.Renviron` secrets never committed — and apply the
-  DS/ML rigor rules (sealed holdout, no leakage, reproducibility) to the **R tidymodels** path,
-  enforced by convention + the `analysis-reviewer` / `eval-reviewer` agents (the ml guard's
-  Python-specific forbidden-feature/sealed-test regexes get an R-aware analogue).
-- **Make the spine real:** the kit README flags the executable spine as dangling — we build a
-  working `scripts/check.sh` (lint + dbt build + freshness), `pyproject.toml` / `uv`, `renv`,
-  and a runnable eval pass.
-
----
-
 ## Phased task list
 
 **Phase 0 — Pre-flight & scaffold**
@@ -213,8 +172,8 @@ into one repo needs the following — verified against the kit contents:
 2. Create the repo dir (`…/Desktop/Send to Github/cfb-analytics`; **gitignore data, `.venv`,
    `renv/library`** — caution re: OneDrive sync of large/locked files) and **copy this plan in
    as `PROJECT_PLAN.md`** (the user's explicit deliverable). `git init`.
-3. Scaffold: compose the 4 kits' `.claude/`, `pyproject.toml`+`uv`, `renv` init, dbt project,
-   DuckDB, `.env`/`.Renviron` templates, `.gitignore`, Mermaid architecture diagram.
+3. Scaffold: `pyproject.toml`+`uv`, `renv` init, dbt project, DuckDB, `.env`/`.Renviron`
+   templates, `.gitignore`, Mermaid architecture diagram.
 
 **Phase 1 — Ingestion → bronze**
 4. R `ingest/` via cfbfastR: bounded, **throttled, cached** pulls (≤1,000 calls/mo) →

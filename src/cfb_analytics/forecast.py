@@ -83,20 +83,40 @@ def forecast(season: int) -> pd.DataFrame:
                                          sched.home_win_prob, 1 - sched.home_win_prob)
     sched["forecast_season"] = season
 
+    # Team-level projection: expected wins = sum over a team's games of P(that team wins).
+    # Each game contributes to both teams (home gets home_win_prob, away gets 1 - that).
+    home = sched[["home_team", "home_win_prob"]].rename(
+        columns={"home_team": "team", "home_win_prob": "win_prob"})
+    away = sched[["away_team", "home_win_prob"]].assign(win_prob=lambda d: 1 - d.home_win_prob)[
+        ["away_team", "win_prob"]].rename(columns={"away_team": "team"})
+    long = pd.concat([home, away], ignore_index=True)
+    teams = (long.groupby("team")
+             .agg(games=("win_prob", "size"), projected_wins=("win_prob", "sum"))
+             .reset_index())
+    teams["projected_losses"] = teams["games"] - teams["projected_wins"]
+    teams["avg_win_prob"] = teams["projected_wins"] / teams["games"]
+    teams["forecast_season"] = season
+    teams = teams.sort_values("projected_wins", ascending=False).reset_index(drop=True)
+    teams["projected_rank"] = teams.index + 1
+
     GOLD_DIR.mkdir(parents=True, exist_ok=True)
-    out_csv = GOLD_DIR / f"forecast_{season}.csv"
-    sched.to_csv(out_csv, index=False)
+    sched.to_csv(GOLD_DIR / f"forecast_{season}.csv", index=False)
+    teams.to_csv(GOLD_DIR / f"forecast_{season}_teams.csv", index=False)
 
     con = duckdb.connect(str(DUCKDB_PATH))
     try:
         con.execute("CREATE SCHEMA IF NOT EXISTS gold")
         con.register("_f", sched)
         con.execute(f"CREATE OR REPLACE TABLE gold.forecast_{season} AS SELECT * FROM _f")
+        con.register("_t", teams)
+        con.execute(f"CREATE OR REPLACE TABLE gold.forecast_{season}_teams AS SELECT * FROM _t")
     finally:
         con.close()
 
     print(f"  gold.forecast_{season}: {len(sched):,} FBS-vs-FBS games scored "
           f"(preseason priors; prior season {prior})")
+    print(f"  gold.forecast_{season}_teams: {len(teams):,} teams projected; "
+          f"top = {teams.iloc[0]['team']} ({teams.iloc[0]['projected_wins']:.1f} exp. wins)")
     return sched
 
 

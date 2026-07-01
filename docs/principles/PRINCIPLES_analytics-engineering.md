@@ -5,7 +5,7 @@ A working checklist distilled from three references, each item cited so it's aud
 - **MED** = *Building Medallion Architectures* (Strengholt)
 - **FDE** = *Fundamentals of Data Engineering* (Reis/Housley)
 
-This is the "why" behind CLAUDE.md's non-negotiables. When a model is in question, walk this list.
+This is the "why" behind this repo's non-negotiables. When a model is in question, walk this list.
 
 ---
 

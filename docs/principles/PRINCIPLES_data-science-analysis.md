@@ -1,7 +1,7 @@
 # Data-Science / Analysis Principles — a working checklist
 
 A digest of practices distilled from the reference library, grouped by phase. This is
-the *why* behind the non-negotiables in CLAUDE.md. Treat each `[ ]` as a check to clear,
+the *why* behind the repo's non-negotiables. Treat each `[ ]` as a check to clear,
 not prose to admire. Citations are by chapter/section (page numbers where useful) so you
 can go read the source.
 
