@@ -126,6 +126,49 @@ FEEDS: dict[str, str] = {
           and h.sos_sp_entering is not null
           and a.sos_sp_entering is not null
     """,
+    # Team style profile: one row per FBS team-season, built from play-by-play (the SP+
+    # success/explosiveness columns came back empty). Multi-stat identity used for PCA + k-means
+    # archetypes (M6): efficiency, success rate, explosiveness, play-calling, pace, havoc.
+    "team_profile": """
+        with fbs as (select distinct school from gold.dim_team where team_id <> -1),
+        off_agg as (
+            select
+                p.offense_team as team, p.season,
+                count(*) filter (where p.is_rush or p.is_pass_attempt)     as off_plays,
+                count(distinct p.game_id)                                  as off_games,
+                avg(p.epa)                                                 as off_epa_play,
+                avg(case when p.is_success then 1.0 else 0.0 end)          as off_success_rate,
+                avg(p.epa) filter (where p.is_success)                     as off_explosiveness,
+                avg(case when p.is_rush then 1.0 else 0.0 end)
+                    filter (where p.is_rush or p.is_pass_attempt)          as rush_rate
+            from gold.fct_play p
+            inner join fbs on p.offense_team = fbs.school
+            where not p.is_garbage_time and (p.is_rush or p.is_pass_attempt)
+            group by p.offense_team, p.season
+        ),
+        def_agg as (
+            select
+                p.defense_team as team, p.season,
+                avg(p.epa)                                                 as def_epa_play,
+                avg(case when p.is_success then 1.0 else 0.0 end)          as def_success_rate
+            from gold.fct_play p
+            inner join fbs on p.defense_team = fbs.school
+            where not p.is_garbage_time and (p.is_rush or p.is_pass_attempt)
+            group by p.defense_team, p.season
+        )
+        select
+            o.team, o.season,
+            o.off_epa_play,
+            o.off_success_rate,
+            o.off_explosiveness,
+            o.rush_rate,
+            (o.off_plays * 1.0 / o.off_games)                             as off_pace,
+            d.def_epa_play,
+            d.def_success_rate
+        from off_agg o
+        inner join def_agg d on o.team = d.team and o.season = d.season
+        where o.off_games >= 8
+    """,
 }
 
 

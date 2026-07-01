@@ -12,10 +12,11 @@ Orchestrated by a Python CLI that runs the R models as subprocess steps — **th
 (DuckDB tables + a metrics JSON) is the contract between languages**, not in-memory objects.
 
 > **Status:** pipeline live end-to-end for 2023–24 FBS. Medallion + Kimball star build green
-> (112 dbt tests, SCD2 `dim_team` capturing the 2024 realignment); the book models **M1–M5** and
-> the game win-probability model run in **R and Python** with a committed **22/22 coefficient
-> parity** gate; the Quarto dashboard renders. See [`PROJECT_PLAN.md`](PROJECT_PLAN.md) for the
-> full design and phased plan. Next: M6–M7 + play-level EPA (Phase 5).
+> (112 dbt tests, SCD2 `dim_team` capturing the 2024 realignment); the book models **M1–M7** and
+> the game win-probability model run in **R and Python** with a committed **R↔Python parity** gate
+> (coefficients agree to tolerance; PCA/cluster/mixed-effects agree label-invariantly); the Quarto
+> dashboard renders. See [`PROJECT_PLAN.md`](PROJECT_PLAN.md) for the full design and phased plan.
+> Next: play-level EPA + optional M8 scraping, then polish (Phase 5–6).
 
 ## Dashboard preview
 
@@ -25,6 +26,11 @@ accuracy** vs a home-field-naive baseline (0.243) and the market line (0.183).
 
 ![Brier score by week — model vs market](docs/preview_brier_by_week.png)
 ![Win-probability calibration (2024 holdout)](docs/preview_calibration.png)
+
+Multilevel shrinkage (M7) then applies the book's regression-to-the-mean lesson — raw rushing
+efficiency is mostly noise (ICC ≈ 1%), so small-sample rushers are pooled toward the league mean:
+
+![Multilevel shrinkage of rushing RYOE](docs/preview_shrinkage.png)
 
 ## Modeling (grounded in the book)
 

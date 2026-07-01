@@ -187,6 +187,44 @@ bind_rows(result("metrics__stability__r.csv"), result("metrics__stability__py.cs
   tab_options(table.font.size = px(12))
 ```
 
+## Team archetypes (M6) — PCA + k-means
+
+Each team-season's 7-stat style profile reduced to 2 principal components, then clustered into
+five archetypes. Efficient, complete teams sit to one side; struggling or one-dimensional teams to
+the other.
+
+```{r archetypes}
+arch <- result("pred__archetype__r.csv") |> mutate(cluster = factor(cluster))
+prof <- gold("team_profile.csv")
+arch <- arch |> left_join(prof, by = c("team", "season"))
+
+# label a few notable 2024 teams so the map is legible
+notable <- c("Ohio State", "Oregon", "Georgia", "Florida State", "Miami", "Army")
+labels24 <- arch |> filter(season == SEASON, team %in% notable)
+
+ggplot(arch, aes(pc1, pc2, colour = cluster)) +
+  geom_point(alpha = 0.55, size = 1.8) +
+  geom_text(data = labels24, aes(label = team), colour = "black", size = 3,
+            vjust = -0.8, show.legend = FALSE) +
+  scale_colour_brewer(palette = "Set1", name = "Archetype") +
+  labs(title = "Team archetypes — principal components of team style (2023–24)",
+       subtitle = "PC1 ≈ overall efficiency; nearby teams play alike. Points = team-seasons.",
+       x = "PC1", y = "PC2")
+```
+
+```{r archetype-profiles}
+arch |>
+  group_by(Archetype = cluster) |>
+  summarise(n = n(), `Off EPA` = mean(off_epa_play), `Def EPA` = mean(def_epa_play),
+            `Run rate` = mean(rush_rate), Pace = mean(off_pace), .groups = "drop") |>
+  gt() |>
+  tab_header(title = "Archetype centroids",
+             subtitle = "Mean style profile per cluster (Def EPA lower = better)") |>
+  fmt_number(columns = c(`Off EPA`, `Def EPA`), decimals = 3) |>
+  fmt_number(columns = c(`Run rate`, Pace), decimals = 2) |>
+  tab_options(table.font.size = px(12))
+```
+
 # Part 2 — Evaluating the models
 
 ## The game win-probability model
@@ -271,6 +309,38 @@ mt |>
   data_color(columns = Model, palette = "Pastel1", alpha = 0.5)
 ```
 
+## Multilevel shrinkage (M7) — regression to the mean
+
+M1 showed rushing efficiency is noisy; a random-intercept model (`ryoe ~ 1 + (1 | rusher)`) acts
+on it. Partial pooling pulls each rusher's raw RYOE toward the league mean — hardest for
+small-sample rushers. Below, the raw averages (grey) fan out wildly at low volume while the
+shrunken estimates (blue) stay disciplined; only high-volume backs keep a large signal.
+
+```{r shrinkage}
+sh <- result("pred__shrinkage__r.csv")
+
+sh_long <- sh |>
+  select(carries, Raw = raw_ryoe, Shrunk = shrunk_ryoe) |>
+  tidyr::pivot_longer(c(Raw, Shrunk), names_to = "estimate", values_to = "ryoe")
+
+ggplot(sh_long, aes(carries, ryoe, colour = estimate)) +
+  geom_hline(yintercept = 0, colour = "grey70") +
+  geom_point(alpha = 0.4, size = 1.3) +
+  scale_x_log10() +
+  scale_colour_manual(values = c(Raw = "grey60", Shrunk = unname(PAL["model"])), name = NULL) +
+  labs(title = "Shrinkage of rushing RYOE — raw vs partially-pooled estimate",
+       subtitle = "Grey = raw per-rusher average; blue = shrunken (trusted) estimate. x = carries (log).",
+       x = "Carries (log scale)", y = "RYOE per carry")
+```
+
+```{r shrinkage-icc}
+icc <- result("metrics__shrinkage__r.csv") |> filter(metric == "icc") |> pull(value)
+```
+
+Only **`r sprintf("%.1f%%", 100 * icc)`** of RYOE variance is *between* rushers (the intra-class
+correlation) — the rest is play-to-play noise. That tiny ICC is exactly why the pooling is so
+aggressive, and it quantitatively confirms the M1 stability finding.
+
 ## R ↔ Python parity — the built-in correctness check
 
 Every method is fit independently in R and Python on the identical feed. Because the fits are
@@ -301,6 +371,28 @@ parity |>
   fmt_scientific(columns = `|Δ|`, decimals = 1) |>
   cols_label(model = "Model", term = "Term", estimate_r = "R", estimate_py = "Python") |>
   data_color(columns = `|Δ|`, palette = c("#1A9850", "#1A9850")) |>
+  tab_options(table.font.size = px(12))
+```
+
+The unsupervised and mixed-effects methods (M6, M7) don't reduce to a single comparable
+coefficient — their fits are sign- or label-ambiguous — so agreement is measured label-invariantly:
+
+```{r parity-m67}
+agree <- bind_rows(
+  result("metrics__archetype_parity__py.csv"),
+  result("metrics__shrinkage_parity__py.csv")) |>
+  filter(metric %in% c("pc1_abs_corr_r_vs_py", "cluster_adjusted_rand_index",
+                       "blup_corr_r_vs_py")) |>
+  mutate(metric = recode(metric,
+    pc1_abs_corr_r_vs_py = "M6 · PC1 |correlation|",
+    cluster_adjusted_rand_index = "M6 · cluster adjusted Rand index",
+    blup_corr_r_vs_py = "M7 · shrunken-estimate correlation")) |>
+  select(Check = metric, Agreement = value)
+
+gt(agree) |>
+  tab_header(title = "R vs Python — M6/M7 agreement",
+             subtitle = "1.0 = identical (PCA up to sign; clusters up to labelling)") |>
+  fmt_number(columns = Agreement, decimals = 3) |>
   tab_options(table.font.size = px(12))
 ```
 

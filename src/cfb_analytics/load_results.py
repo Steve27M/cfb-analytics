@@ -43,8 +43,12 @@ def parity_check(coef: pd.DataFrame) -> pd.DataFrame:
 def load() -> None:
     coef = _read_glob("coef__*.csv")
     metrics = _read_glob("metrics__*.csv")
-    preds = _read_glob("pred__*.csv")          # play-grain RYOE/CPOE residuals
-    game_preds = _read_glob("gamepred__*.csv")  # game-grain win-prob predictions
+    # each prediction family has its own grain → its own table
+    preds = pd.concat([_read_glob("pred__ryoe__*.csv"), _read_glob("pred__cpoe__*.csv")],
+                      ignore_index=True)            # play-grain RYOE/CPOE residuals
+    game_preds = _read_glob("gamepred__*.csv")      # game-grain win-prob predictions
+    archetypes = _read_glob("pred__archetype__*.csv")   # team-season PC coords + cluster (M6)
+    shrinkage = _read_glob("pred__shrinkage__*.csv")    # per-rusher raw vs shrunk RYOE (M7)
     if coef.empty:
         raise SystemExit("no results found in data/results — run the R/Python models first")
 
@@ -58,6 +62,8 @@ def load() -> None:
             ("model_metrics", metrics),
             ("predictions", preds),
             ("game_predictions", game_preds),
+            ("team_archetypes", archetypes),
+            ("player_shrinkage", shrinkage),
             ("model_parity", parity),
         ]:
             if df.empty:

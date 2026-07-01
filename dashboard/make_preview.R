@@ -49,4 +49,22 @@ p_bw <- ggplot(bw, aes(week, brier, colour = source)) +
 ggsave(file.path("docs", "preview_brier_by_week.png"), p_bw,
        width = 9, height = 5, dpi = 150, bg = "white")
 
-cat("wrote docs/preview_calibration.png and docs/preview_brier_by_week.png\n")
+# 3. M7 shrinkage — raw vs partially-pooled RYOE (regression to the mean)
+sh <- readr::read_csv(file.path("data", "results", "pred__shrinkage__r.csv"),
+                      show_col_types = FALSE) %>%
+  select(carries, Raw = raw_ryoe, Shrunk = shrunk_ryoe) %>%
+  tidyr::pivot_longer(c(Raw, Shrunk), names_to = "estimate", values_to = "ryoe")
+
+p_sh <- ggplot(sh, aes(carries, ryoe, colour = estimate)) +
+  geom_hline(yintercept = 0, colour = "grey70") +
+  geom_point(alpha = 0.4, size = 1.3) +
+  scale_x_log10() +
+  scale_colour_manual(values = c(Raw = "grey60", Shrunk = MODEL), name = NULL) +
+  labs(title = "Multilevel shrinkage of rushing RYOE (M7)",
+       subtitle = "Grey = raw per-rusher average; blue = shrunken estimate. Small samples regress to the mean.",
+       x = "Carries (log scale)", y = "RYOE per carry", caption = ATTRIB)
+
+ggsave(file.path("docs", "preview_shrinkage.png"), p_sh,
+       width = 9, height = 5, dpi = 150, bg = "white")
+
+cat("wrote docs/preview_{calibration,brier_by_week,shrinkage}.png\n")

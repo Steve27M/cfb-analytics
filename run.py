@@ -118,6 +118,8 @@ def models() -> None:
         "analysis/R/ryoe.R",            # M2/M3 RYOE (lm)
         "analysis/R/cpoe.R",            # M4 CPOE (glm binomial)
         "analysis/R/poisson.R",         # M5 passing-TD Poisson
+        "analysis/R/archetypes.R",      # M6 PCA + k-means archetypes
+        "analysis/R/shrinkage.R",       # M7 multilevel shrinkage
         "analysis/R/game_model_train.R",  # game win-prob model (tidymodels) — phase 3b
         "analysis/R/game_model_score.R",
     ]
@@ -132,7 +134,7 @@ def models() -> None:
 @app.command()
 def parity() -> None:
     """Run the Python parity fits, then load all results to gold with the R<->Python parity gate."""
-    for s in ["stability", "ryoe", "cpoe", "poisson", "game_model"]:
+    for s in ["stability", "ryoe", "cpoe", "poisson", "archetypes", "shrinkage", "game_model"]:
         script = f"analysis/python/{s}.py"
         if (REPO_ROOT / script).exists():
             _run(["uv", "run", "python", script])
