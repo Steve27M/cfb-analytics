@@ -6,6 +6,9 @@ transforms it with **dbt** (medallion → Kimball star, incl. an SCD2 dimension)
 statistical models from *Football Analytics with Python & R* (Eager & Erickson) in **both R and
 Python**, and renders a **Quarto dashboard** that evaluates the data and the models' accuracy.
 
+> 👉 **New to this / non-technical?** Read the plain-English [**Guide**](GUIDE.md) — it explains
+> what this is, how it works, and how to read every chart, with no jargon assumed.
+
 **Stack:** R (`cfbfastR`, `tidyverse`, `tidymodels`, `lme4`, `gt`, `cfbplotR`) ·
 Python (`uv`, `dbt-duckdb`, `statsmodels`, `scikit-learn`) · DuckDB · dbt · Quarto.
 Orchestrated by a Python CLI that runs the R models as subprocess steps — **the data
