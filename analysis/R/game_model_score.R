@@ -17,8 +17,10 @@ MARGIN_SD <- 13.5   # well-known CFB final-margin standard deviation, for the ma
 df <- cfb_read_gold("game_model")
 df$home_won <- factor(df$home_won, levels = c(0, 1))
 
-train <- df %>% filter(season == 2023)
-test  <- df %>% filter(season == 2024)
+# Holdout = latest season (matches game_model_train.R); train = every earlier season.
+holdout_season <- max(df$season)
+train <- df %>% filter(season < holdout_season)
+test  <- df %>% filter(season == holdout_season)
 
 final_fit <- readRDS(file.path(getwd(), "artifacts", "models", "game_model.rds"))
 

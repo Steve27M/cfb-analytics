@@ -37,7 +37,10 @@ dash    <- function(f) read_csv(file.path("data", "dashboard", f), show_col_type
 
 theme_set(theme_minimal(base_size = 12))
 PAL <- c(r = "#2C7FB8", py = "#D95F0E", model = "#2C7FB8", market = "#D95F0E")
-SEASON <- 2024  # headline season for the leaderboards
+SEASON <- 2025         # headline season for TEAM-level views (latest available)
+# cfbfastR's 2025 play-by-play has incomplete PLAYER attribution (~56% of rushes named vs ~96%
+# in 2023-24), so PLAYER leaderboards feature the last fully-attributed season instead.
+PLAYER_SEASON <- 2024
 ```
 
 > **Data:** [CollegeFootballData.com](https://collegefootballdata.com) (CFBD API, free tier).
@@ -111,6 +114,8 @@ te |>
 
 The book's residual framework: model the *expected* outcome from game situation; the residual is
 skill. **RYOE** (rushing yards over expected, M3) and **CPOE** (completion % over expected, M4).
+*(Featuring `r PLAYER_SEASON` — the latest season with complete player attribution in the source;
+2025 play-by-play is fully loaded at the team level but names only ~56% of rushes so far.)*
 
 ```{r ryoe-cpoe}
 plays <- gold("plays_model.csv") |>
@@ -118,7 +123,7 @@ plays <- gold("plays_model.csv") |>
 
 ryoe_lb <- result("pred__ryoe__r.csv") |>
   inner_join(plays, by = "play_key") |>
-  filter(season == SEASON, !is.na(rusher_player_name)) |>
+  filter(season == PLAYER_SEASON, !is.na(rusher_player_name)) |>
   group_by(Player = rusher_player_name, Team = offense_team) |>
   summarise(Carries = n(), `RYOE/att` = mean(ryoe), .groups = "drop") |>
   filter(Carries >= 100) |>
@@ -127,7 +132,7 @@ ryoe_lb <- result("pred__ryoe__r.csv") |>
 
 cpoe_lb <- result("pred__cpoe__r.csv") |>
   inner_join(plays, by = "play_key") |>
-  filter(season == SEASON, !is.na(passer_player_name)) |>
+  filter(season == PLAYER_SEASON, !is.na(passer_player_name)) |>
   group_by(Player = passer_player_name, Team = offense_team) |>
   summarise(Attempts = n(), `CPOE` = mean(cpoe), .groups = "drop") |>
   filter(Attempts >= 200) |>
@@ -135,7 +140,7 @@ cpoe_lb <- result("pred__cpoe__r.csv") |>
   slice_head(n = 10)
 
 gt(ryoe_lb) |>
-  tab_header(title = "Rushing Yards Over Expected", subtitle = sprintf("%d · ≥100 carries", SEASON)) |>
+  tab_header(title = "Rushing Yards Over Expected", subtitle = sprintf("%d · ≥100 carries", PLAYER_SEASON)) |>
   fmt_number(columns = `RYOE/att`, decimals = 2) |>
   data_color(columns = `RYOE/att`, palette = "Blues") |>
   tab_options(table.font.size = px(12))
@@ -143,7 +148,7 @@ gt(ryoe_lb) |>
 
 ```{r cpoe-lb}
 gt(cpoe_lb) |>
-  tab_header(title = "Completion % Over Expected", subtitle = sprintf("%d · ≥200 attempts", SEASON)) |>
+  tab_header(title = "Completion % Over Expected", subtitle = sprintf("%d · ≥200 attempts", PLAYER_SEASON)) |>
   fmt_percent(columns = CPOE, decimals = 1) |>
   data_color(columns = CPOE, palette = "Blues") |>
   tab_options(table.font.size = px(12))
@@ -156,7 +161,7 @@ reliable, skill-driven metric; a loose cloud = mostly noise (and a candidate for
 
 ```{r stability-plot}
 pr <- gold("player_rushing.csv") |>
-  filter(season == SEASON, attempts_odd >= 40, attempts_even >= 40)
+  filter(season == PLAYER_SEASON, attempts_odd >= 40, attempts_even >= 40)
 
 r_split <- cor(pr$ypc_odd_plays, pr$ypc_even_plays, use = "complete.obs")
 
@@ -165,7 +170,7 @@ ggplot(pr, aes(ypc_odd_plays, ypc_even_plays)) +
   geom_point(alpha = 0.5, colour = PAL["model"], size = 1.8) +
   geom_smooth(method = "lm", se = FALSE, colour = PAL["market"], linewidth = 0.8) +
   labs(
-    title = sprintf("Rushing YPC split-half reliability, %d  (r = %.2f)", SEASON, r_split),
+    title = sprintf("Rushing YPC split-half reliability, %d  (r = %.2f)", PLAYER_SEASON, r_split),
     subtitle = "Each point = a rusher (≥40 carries in each half). Loose spread ⇒ YPC is noisy.",
     x = "Yards/carry — odd plays", y = "Yards/carry — even plays") +
   coord_equal()
@@ -207,7 +212,7 @@ ggplot(arch, aes(pc1, pc2, colour = cluster)) +
   geom_text(data = labels24, aes(label = team), colour = "black", size = 3,
             vjust = -0.8, show.legend = FALSE) +
   scale_colour_brewer(palette = "Set1", name = "Archetype") +
-  labs(title = "Team archetypes — principal components of team style (2023–24)",
+  labs(title = "Team archetypes — principal components of team style (2023–25)",
        subtitle = "PC1 ≈ overall efficiency; nearby teams play alike. Points = team-seasons.",
        x = "PC1", y = "PC2")
 ```
@@ -240,7 +245,7 @@ ggplot(eps, aes(yards_to_goal, expected_points, colour = down)) +
   geom_line(linewidth = 0.9) +
   scale_x_reverse() +
   scale_colour_brewer(palette = "Set1", name = "Down") +
-  labs(title = "Expected points by field position and down (2023–24)",
+  labs(title = "Expected points by field position and down (2023–25)",
        subtitle = "x reversed: goal line at right. EP falls with distance and later downs.",
        x = "Yards to opponent's goal", y = "Expected points")
 ```
@@ -250,8 +255,8 @@ ggplot(eps, aes(yards_to_goal, expected_points, colour = down)) +
 ## The game win-probability model
 
 Logistic model of P(home win) from leakage-safe entering-form efficiency differentials. Trained on
-2023, evaluated on the **sealed 2024 holdout** against a home-field-naive baseline and the
-**betting market** (the bar to clear).
+the earlier seasons (2023–24) and evaluated on the **sealed 2025 holdout** — a season it never saw —
+against a home-field-naive baseline and the **betting market** (the bar to clear).
 
 ```{r game-metrics}
 gm <- bind_rows(result("metrics__game__r.csv"), result("metrics__game__py.csv")) |>
@@ -265,7 +270,7 @@ tibble(
   `Naive (home-field)` = c(val("brier_naive_homefield"), NA, NA, NA)
 ) |>
   gt() |>
-  tab_header(title = "2024 holdout accuracy",
+  tab_header(title = "2025 holdout accuracy",
              subtitle = "Lower Brier/log-loss = better; the model approaches the market using on-field efficiency only") |>
   fmt_number(columns = c(Model, `Market line`, `Naive (home-field)`), decimals = 3) |>
   sub_missing(missing_text = "—") |>
@@ -287,7 +292,7 @@ ggplot(calib, aes(pred, obs)) +
   scale_size_area(max_size = 8, guide = "none") +
   scale_x_continuous(labels = percent, limits = c(0, 1)) +
   scale_y_continuous(labels = percent, limits = c(0, 1)) +
-  labs(title = "Calibration — predicted vs observed home-win rate (2024 holdout)",
+  labs(title = "Calibration — predicted vs observed home-win rate (2025 holdout)",
        subtitle = "On the diagonal = well-calibrated probabilities. Point size = games in bin.",
        x = "Predicted P(home win)", y = "Observed home-win rate") +
   coord_equal()
@@ -306,7 +311,7 @@ ggplot(bw, aes(week, brier, colour = source)) +
   geom_point(size = 1.8) +
   scale_colour_manual(values = c(Model = unname(PAL["model"]), Market = unname(PAL["market"])),
                       name = NULL) +
-  labs(title = "Brier score by week — model vs betting market (2024)",
+  labs(title = "Brier score by week — model vs betting market (2025)",
        subtitle = "The market is hard to beat; the efficiency model tracks it closely.",
        x = "Week", y = "Brier score")
 ```
@@ -381,7 +386,7 @@ ggplot(rec, aes(recruiting_rank_247, sp_rating)) +
             size = 3, vjust = -0.9, colour = "black") +
   scale_colour_gradient2(low = "#B2182B", mid = "grey80", high = "#2166AC",
                          name = "Over /\nunder") +
-  labs(title = "On-field production vs recruiting-class rank (top-25 classes, 2023–24)",
+  labs(title = "On-field production vs recruiting-class rank (top-25 classes, 2023–25)",
        subtitle = "Above the line = beating their recruiting; below = underachieving.",
        x = "Recruiting-class rank (1 = best)", y = "SP+ rating (higher = better)")
 ```

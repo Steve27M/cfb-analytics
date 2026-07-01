@@ -44,14 +44,18 @@ def _logloss(y: np.ndarray, p: np.ndarray) -> float:
 
 def main() -> None:
     df = pd.read_csv(GOLD / "game_model.csv")
-    train = df[df.season == 2023].sort_values("week").reset_index(drop=True)
-    test = df[df.season == 2024].reset_index(drop=True)
+    # Sealed holdout = latest season; train on every earlier season (mirrors game_model_train.R).
+    holdout_season = int(df.season.max())
+    train = df[df.season < holdout_season].sort_values(["season", "week"]).reset_index(drop=True)
+    test = df[df.season == holdout_season].reset_index(drop=True)
+    cv_season = int(train.season.max())
 
-    # walk-forward CV on 2023 (train weeks < k, predict week k) — mirrors the R report
-    weeks = sorted(train.week.unique())
+    # time-aware walk-forward CV within the latest training season (earlier seasons + weeks < k)
+    weeks = sorted(train.loc[train.season == cv_season, "week"].unique())
     cv_y, cv_p = [], []
     for k in [w for w in weeks if w >= weeks[0] + 2]:
-        tr, te = train[train.week < k], train[train.week == k]
+        tr = train[(train.season < cv_season) | ((train.season == cv_season) & (train.week < k))]
+        te = train[(train.season == cv_season) & (train.week == k)]
         if len(tr) < 30 or len(te) == 0:
             continue
         m = _fit(tr)

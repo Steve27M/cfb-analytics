@@ -24,7 +24,7 @@ p_cal <- ggplot(calib, aes(pred, obs)) +
   scale_size_area(max_size = 9, guide = "none") +
   scale_x_continuous(labels = percent, limits = c(0, 1)) +
   scale_y_continuous(labels = percent, limits = c(0, 1)) +
-  labs(title = "Game win-probability model — calibration (2024 holdout)",
+  labs(title = "Game win-probability model — calibration (2025 holdout)",
        subtitle = "Points on the diagonal = well-calibrated probabilities. Size = games in bin.",
        x = "Predicted P(home win)", y = "Observed home-win rate", caption = ATTRIB) +
   coord_equal()
@@ -42,7 +42,7 @@ bw <- gp %>%
 p_bw <- ggplot(bw, aes(week, brier, colour = source)) +
   geom_line(linewidth = 0.9) + geom_point(size = 2) +
   scale_colour_manual(values = c(Model = MODEL, Market = MARKET), name = NULL) +
-  labs(title = "Brier score by week — efficiency model vs betting market (2024)",
+  labs(title = "Brier score by week — efficiency model vs betting market (2025)",
        subtitle = "Lower is better. The model tracks the market using only on-field efficiency.",
        x = "Week", y = "Brier score", caption = ATTRIB)
 
@@ -78,7 +78,7 @@ p_rec <- ggplot(rec, aes(recruiting_rank_247, sp_rating)) +
   geom_text(data = ext, aes(label = paste0(team, " '", substr(season, 3, 4))),
             size = 3, vjust = -0.9) +
   scale_colour_gradient2(low = "#B2182B", mid = "grey80", high = "#2166AC", name = "Over /\nunder") +
-  labs(title = "On-field production vs recruiting rank (top-25 classes, 2023-24)",
+  labs(title = "On-field production vs recruiting rank (top-25 classes, 2023-25)",
        subtitle = "Above line = beat recruiting; below = underachieved.",
        x = "Recruiting-class rank (1 = best)", y = "SP+ rating", caption = ATTRIB)
 ggsave(file.path("docs", "preview_recruiting.png"), p_rec,

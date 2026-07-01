@@ -8,6 +8,19 @@ with snap as (
 
 ),
 
+-- One version per (team_id, source_season). Guards against snapshot re-runs, and lets us derive
+-- validity from the SEASON the version describes rather than wall-clock run order (the snapshot
+-- may be replayed out of chronological order, which would otherwise invert/overlap the ranges).
+snap_dedup as (
+
+    select *
+    from snap
+    qualify row_number() over (
+        partition by team_id, source_season order by dbt_valid_from desc
+    ) = 1
+
+),
+
 versioned as (
 
     select
@@ -22,18 +35,16 @@ versioned as (
         color,
         alt_color,
         logo,
-        dbt_valid_from,
-        dbt_valid_to,
-        -- season this version starts covering, and (next version's start - 1) it stops at
+        -- season this version starts covering, and (next version's start - 1) it stops at,
+        -- ordered by the data's own season chronology so the ranges never overlap
         source_season                                   as valid_from_season,
         coalesce(
             lead(source_season) over (
-                partition by team_id order by dbt_valid_from
+                partition by team_id order by source_season
             ) - 1,
             9999
-        )                                               as valid_to_season,
-        (dbt_valid_to is null)                          as is_current
-    from snap
+        )                                               as valid_to_season
+    from snap_dedup
 
 ),
 
@@ -53,7 +64,7 @@ versions as (
         logo,
         valid_from_season,
         valid_to_season,
-        is_current
+        (valid_to_season = 9999)                        as is_current
     from versioned
 
 ),

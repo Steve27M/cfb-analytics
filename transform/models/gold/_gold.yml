@@ -51,8 +51,8 @@ models:
           combination_of_columns: [game_id, team_id]
       # volume: ~2 rows per FBS-touching game per season; alert if the fact collapses
       - dbt_expectations.expect_table_row_count_to_be_between:
-          min_value: 3000
-          max_value: 4500
+          min_value: 4500
+          max_value: 7500
     columns:
       - name: team_game_sk
         data_tests: [not_null, unique]
@@ -80,8 +80,8 @@ models:
       RYOE/CPOE "over expected" residuals written back by the R/Python models.
     data_tests:
       - dbt_expectations.expect_table_row_count_to_be_between:
-          min_value: 500000
-          max_value: 540000
+          min_value: 700000
+          max_value: 900000
     columns:
       - name: play_key
         data_tests: [not_null, unique]

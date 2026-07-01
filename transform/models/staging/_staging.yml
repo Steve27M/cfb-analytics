@@ -12,7 +12,7 @@ models:
       - name: season
         data_tests:
           - not_null
-          - accepted_values: { values: [2023, 2024], quote: false }
+          - accepted_values: { values: [2023, 2024, 2025], quote: false }
       - name: home_team_id
         data_tests: [not_null]
       - name: away_team_id
@@ -35,7 +35,7 @@ models:
       - name: season
         data_tests:
           - not_null
-          - accepted_values: { values: [2023, 2024], quote: false }
+          - accepted_values: { values: [2023, 2024, 2025], quote: false }
       - name: game_play_number
         data_tests: [not_null]
 
@@ -70,7 +70,7 @@ models:
       - name: season
         data_tests:
           - not_null
-          - accepted_values: { values: [2023, 2024], quote: false }
+          - accepted_values: { values: [2023, 2024, 2025], quote: false }
       - name: sp_rating
         data_tests: [not_null]
 
@@ -89,7 +89,7 @@ models:
       - name: season
         data_tests:
           - not_null
-          - accepted_values: { values: [2023, 2024], quote: false }
+          - accepted_values: { values: [2023, 2024, 2025], quote: false }
 
   - name: stg_cfbd__calendar
     description: >
@@ -117,7 +117,7 @@ models:
       - name: season
         data_tests:
           - not_null
-          - accepted_values: { values: [2023, 2024], quote: false }
+          - accepted_values: { values: [2023, 2024, 2025], quote: false }
       - name: recruiting_rank_247
         data_tests:
           - not_null

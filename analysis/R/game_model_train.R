@@ -22,19 +22,24 @@ f <- as.formula(paste("home_won ~", paste(FEATURES, collapse = " + ")))
 df <- cfb_read_gold("game_model")
 df$home_won <- factor(df$home_won, levels = c(0, 1))   # "1" = home win = event of interest
 
-train <- df %>% filter(season == 2023) %>% arrange(week)
+# Sealed holdout = the most recent season; train on every earlier season (auto-adapts as
+# seasons are added). With 2023-25 loaded this trains on 2023+2024 and holds out 2025.
+holdout_season <- max(df$season)
+train <- df %>% filter(season < holdout_season) %>% arrange(season, week)
+cv_season <- max(train$season)   # walk forward within the latest training season
 
 spec <- logistic_reg() %>% set_engine("glm")
 wf <- workflow() %>% add_formula(f) %>% add_model(spec)
 
 brier <- function(y, p) mean((as.numeric(as.character(y)) - p)^2)
 
-# Walk-forward CV: for each week k (after a 2-week burn-in), train on weeks < k, predict week k.
-weeks <- sort(unique(train$week))
+# Time-aware walk-forward CV: predict each week k of the latest training season using all
+# earlier seasons plus that season's weeks < k (no leakage).
+weeks <- sort(unique(train$week[train$season == cv_season]))
 cv_pred <- list()
 for (k in weeks[weeks >= min(weeks) + 2]) {
-  tr <- train %>% filter(week < k)
-  te <- train %>% filter(week == k)
+  tr <- train %>% filter(season < cv_season | (season == cv_season & week < k))
+  te <- train %>% filter(season == cv_season, week == k)
   if (nrow(tr) < 30 || nrow(te) == 0) next
   m <- fit(wf, tr)
   p <- predict(m, te, type = "prob")$.pred_1
@@ -51,7 +56,7 @@ cv_metrics <- data.frame(
     nrow(cv)),
   language = "r")
 
-# Final fit on ALL of 2023 → the artifact the holdout scorer loads
+# Final fit on ALL earlier seasons → the artifact the holdout scorer loads
 final_fit <- fit(wf, train)
 
 coef <- tidy(extract_fit_engine(final_fit)) %>%
@@ -62,5 +67,6 @@ dir.create(file.path(getwd(), "artifacts", "models"), showWarnings = FALSE, recu
 saveRDS(final_fit, file.path(getwd(), "artifacts", "models", "game_model.rds"))
 cfb_write_result("coef__game__r", coef)
 cfb_write_result("metrics__game_cv__r", cv_metrics)
-cat(sprintf("[game/train/R] CV Brier=%.4f AUC=%.3f over %d games; trained on %d (2023)\n",
-            cv_metrics$value[1], cv_metrics$value[3], cv_metrics$value[4], nrow(train)))
+cat(sprintf("[game/train/R] CV Brier=%.4f AUC=%.3f over %d games; trained on %d games (<%d)\n",
+            cv_metrics$value[1], cv_metrics$value[3], cv_metrics$value[4],
+            nrow(train), holdout_season))
