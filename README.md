@@ -6,6 +6,8 @@ transforms it with **dbt** (medallion → Kimball star, incl. an SCD2 dimension)
 statistical models from *Football Analytics with Python & R* (Eager & Erickson) in **both R and
 Python**, and renders a **Quarto dashboard** that evaluates the data and the models' accuracy.
 
+> 📊 **[View the live interactive dashboard →](https://steve27m.github.io/cfb-analytics/)**
+>
 > 👉 **New to this / non-technical?** Read the plain-English [**Guide**](GUIDE.md) — it explains
 > what this is, how it works, and how to read every chart, with no jargon assumed.
 
@@ -22,6 +24,8 @@ Orchestrated by a Python CLI that runs the R models as subprocess steps — **th
 > Next: play-level EPA + optional M8 scraping, then polish (Phase 5–6).
 
 ## Dashboard preview
+
+**[Explore the full interactive version →](https://steve27m.github.io/cfb-analytics/)**
 
 The game win-probability model, trained on 2023 and evaluated on the **sealed 2024 holdout**,
 approaches the betting market using only on-field efficiency — **Brier 0.195, AUC 0.76, 70%
