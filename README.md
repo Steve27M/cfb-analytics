@@ -62,8 +62,10 @@ benchmarked against the CFBD betting line.
 - **Rate limits:** free tier = **1,000 API calls/month**; Cloudflare blocks bursty parallel
   requests. Ingestion is therefore **bounded, throttled, and cached** — a season already in
   bronze is never re-pulled.
-- **Redistribution:** raw data is **gitignored**; only code, aggregates, and an attributed
-  screenshot are committed. The dashboard HTML (which embeds data) is gitignored.
+- **Redistribution:** raw data (play-by-play, the DuckDB warehouse) is **gitignored and never
+  published**. Only **aggregate results** (leaderboards, model metrics, charts) and **derived code**
+  are published — including the live dashboard — always with attribution. This is derived,
+  non-commercial work, not a re-hosting of CFBD's raw dataset.
 - **Verdict: GO-WITH-CONDITIONS** — non-commercial portfolio use, attributed, bounded
   on-demand collection (no perpetual poller). Confirm the current Terms at key registration.
 

@@ -19,9 +19,10 @@ artifacts/models/*.pkl
 artifacts/metrics.json
 !artifacts/.gitkeep
 
-# --- Dashboard build output (embeds data → do not publish HTML) ---
-docs/**/*.html
-docs/**/*_files/
+# --- Dashboard build output ---
+# docs/ is the GitHub Pages publish dir. It contains ONLY aggregate results + attribution
+# (leaderboards, model metrics, charts) — never raw data — so it IS published. Raw play-by-play,
+# the DuckDB warehouse, and the model feeds stay gitignored (see the Data/Secrets sections above).
 dashboard/**/*.html
 dashboard/**/*_files/
 .quarto/

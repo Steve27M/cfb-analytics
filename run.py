@@ -143,10 +143,15 @@ def parity() -> None:
 
 @app.command()
 def dashboard() -> None:
-    """Prepare feeds (Python/DuckDB), render Quarto to docs/, refresh committed preview PNGs."""
+    """Prepare feeds (Python/DuckDB), render Quarto to docs/, refresh preview PNGs, publish index."""
     _run(["uv", "run", "python", "dashboard/prepare_dashboard_data.py"])
     _run([_find_quarto(), "render", "dashboard/dashboard.qmd"])
     _run([_find_rscript(), "dashboard/make_preview.R"])
+    # GitHub Pages serves docs/; make the dashboard the site root at docs/index.html.
+    src = REPO_ROOT / "docs" / "dashboard" / "dashboard.html"
+    if src.exists():
+        shutil.copyfile(src, REPO_ROOT / "docs" / "index.html")
+        console.print("[green]Published docs/index.html for GitHub Pages.[/green]")
 
 
 @app.callback(invoke_without_command=True)
