@@ -8,6 +8,11 @@ Python**, and renders a **Quarto dashboard** that evaluates the data and the mod
 
 > 📊 **[View the live interactive dashboard →](https://steve27m.github.io/cfb-analytics/)**
 >
+> 🏈 **Explore the standalone GRIDIRONIQ pages:**
+> [**Compare any two teams**](https://steve27m.github.io/cfb-analytics/compare.html) ·
+> [**Stat guide**](https://steve27m.github.io/cfb-analytics/glossary.html) ·
+> [**The models**](https://steve27m.github.io/cfb-analytics/models.html) (how they work + how well they perform).
+>
 > 👉 **New to this / non-technical?** Read the plain-English [**Guide**](GUIDE.md) — it explains
 > what this is, how it works, and how to read every chart, with no jargon assumed.
 
@@ -16,20 +21,23 @@ Python (`uv`, `dbt-duckdb`, `statsmodels`, `scikit-learn`) · DuckDB · dbt · Q
 Orchestrated by a Python CLI that runs the R models as subprocess steps — **the data
 (DuckDB tables + a metrics JSON) is the contract between languages**, not in-memory objects.
 
-> **Status:** pipeline live end-to-end for 2023–24 FBS. Medallion + Kimball star build green
-> (119 dbt tests, SCD2 `dim_team` capturing the 2024 realignment); the book models **M1–M8** and
-> the game win-probability model run in **R and Python** with a committed **R↔Python parity** gate
-> (coefficients agree to tolerance; PCA/cluster/mixed-effects agree label-invariantly); the Quarto
-> dashboard is [**live on Pages**](https://steve27m.github.io/cfb-analytics/). See
-> [`PROJECT_PLAN.md`](PROJECT_PLAN.md) for the full design and phased plan.
+> **Status:** pipeline live end-to-end for 2023–25 FBS, with a **live 2026-season forecast**.
+> Medallion + Kimball star build green (SCD2 `dim_team` capturing the 2024 realignment); the book
+> models **M1–M8** and the game win-probability model run in **R and Python** with a committed
+> **R↔Python parity** gate (coefficients agree to tolerance; PCA/cluster/mixed-effects agree
+> label-invariantly); the Quarto dashboard plus three standalone **GRIDIRONIQ** pages (team
+> comparison, stat guide, models explainer) are [**live on Pages**](https://steve27m.github.io/cfb-analytics/).
+> See [`PROJECT_PLAN.md`](PROJECT_PLAN.md) for the full design and phased plan.
 
 ## Dashboard preview
 
 **[Explore the full interactive version →](https://steve27m.github.io/cfb-analytics/)**
 
-The game win-probability model, trained on 2023 and evaluated on the **sealed 2024 holdout**,
-approaches the betting market using only on-field efficiency — **Brier 0.195, AUC 0.76, 70%
-accuracy** vs a home-field-naive baseline (0.243) and the market line (0.183).
+The game win-probability model, trained on prior seasons and evaluated on the **sealed 2025 holdout**,
+approaches the betting market using only on-field efficiency — **Brier 0.191, AUC 0.77, 70%
+accuracy** vs a home-field-naive baseline (0.243) and the market line (0.176). The
+[models page](https://steve27m.github.io/cfb-analytics/models.html) stress-tests this honestly:
+it *doesn't* beat the closing line, and shows exactly why.
 
 ![Brier score by week — model vs market](docs/preview_brier_by_week.png)
 ![Win-probability calibration (2024 holdout)](docs/preview_calibration.png)
@@ -97,9 +105,11 @@ uv run python run.py ingest     # CFBD  -> data/bronze/*.csv   (quota-aware, cac
 uv run python run.py land       # bronze CSVs -> DuckDB bronze.*
 uv run python run.py build      # dbt: staging -> SCD2 snapshot -> silver -> gold (+ tests)
 uv run python run.py export     # gold/silver -> data/gold/*.csv model feeds
-uv run python run.py models     # book models M1-M7 + game model, in R
-uv run python run.py parity     # Python parity fits + load_results (R<->Python parity GATE)
+uv run python run.py models     # book models M1-M8 + game model, in R
+uv run python run.py parity     # Python parity fits + market-edge eval + load_results (parity GATE)
 uv run python run.py dashboard  # prepare feeds, render Quarto -> docs/, refresh preview PNGs
+uv run python run.py compare    # build the standalone GRIDIRONIQ pages (compare/glossary/models)
+uv run python run.py forecast 2026   # score an upcoming season's schedule with the priors model
 ```
 
 ## Case study — engineering & modeling decisions
