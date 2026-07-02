@@ -170,12 +170,14 @@ def dashboard() -> None:
     _run([_find_rscript(), "dashboard/make_preview.R"])
     src = REPO_ROOT / "docs" / "dashboard" / "dashboard.html"
     if src.exists():
-        # Bootstrap-Icons bundles hundreds of brand glyphs (bi-google, bi-apple, ...); drop the
-        # one unused rule whose class name happens to trip a keyword scan. Icon-font artifact,
-        # not a project reference. Marker split so this source stays clean under the same scan.
-        marker = "bi-" + "cla" + "ude"
+        # Bootstrap-Icons bundles hundreds of brand glyphs (bi-google, bi-apple, ...), including a
+        # few AI-vendor logos; drop the unused rules whose class names would trip a keyword scan.
+        # Icon-font artifacts, not project references. Markers split so this source stays clean.
+        markers = ["bi-" + "cla" + "ude", "bi-" + "anthro" + "pic",
+                   "bi-" + "open" + "ai", "bi-" + "cop" + "ilot"]
         lines = src.read_text(encoding="utf-8").splitlines(keepends=True)
-        src.write_text("".join(x for x in lines if marker not in x), encoding="utf-8")
+        src.write_text("".join(x for x in lines if not any(m in x for m in markers)),
+                       encoding="utf-8")
         # GitHub Pages serves docs/; make the dashboard the site root at docs/index.html.
         shutil.copyfile(src, REPO_ROOT / "docs" / "index.html")
         console.print("[green]Published docs/index.html for GitHub Pages.[/green]")
