@@ -24,6 +24,11 @@ artifacts/metrics.json
 # (leaderboards, model metrics, charts) — never raw data — so it IS published. Raw play-by-play,
 # the DuckDB warehouse, and the model feeds stay gitignored (see the Data/Secrets sections above).
 dashboard/**/*.html
+# ...but the hand-written page SOURCES (design + JS with __DATA__ injection tokens, no real data)
+# are tracked so the standalone-page build is reproducible from a clean clone.
+!dashboard/compare_template.html
+!dashboard/glossary_template.html
+!dashboard/models_template.html
 dashboard/**/*_files/
 .quarto/
 # derived dashboard feeds (Python writes these from the warehouse at render time)

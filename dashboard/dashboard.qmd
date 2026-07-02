@@ -49,6 +49,17 @@ PLAYER_SEASON <- 2024
 > **both R and Python** against the same warehouse feed; their agreement is a built-in correctness
 > check (see *R ↔ Python parity*).
 
+::: {.callout-tip appearance="simple"}
+🏈 **[Open the interactive Team Comparison →](compare.html)** — pick any two FBS teams and compare
+their 2025 season head-to-head (SP+, EPA, efficiency, player leaders) with a neutral-field matchup
+projection and 2026 win forecast.
+
+📖 **[Stat Guide →](glossary.html)** — a plain-English data dictionary for every metric, with the
+2025 FBS range for each. &nbsp;•&nbsp; 🧪 **[The Models →](models.html)** — how the projections
+work and how well they perform: an interactive win-probability curve, a real held-out calibration
+plot, baseline comparisons, and the R ↔ Python parity gate.
+:::
+
 # Part 1 — Evaluating the data
 
 ## Data-quality panel

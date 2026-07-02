@@ -142,6 +142,9 @@ def parity() -> None:
         script = f"analysis/python/{s}.py"
         if (REPO_ROOT / script).exists():
             _run(["uv", "run", "python", script])
+    # market-efficiency diagnostic — reads the game model's held-out predictions written above
+    if (REPO_ROOT / "analysis/python/market_edge.py").exists():
+        _run(["uv", "run", "python", "analysis/python/market_edge.py"])
     _run(["uv", "run", "python", "-m", "cfb_analytics.load_results"])
 
 
@@ -149,6 +152,14 @@ def parity() -> None:
 def forecast(season: int = typer.Argument(2026, help="Future season to forecast.")) -> None:
     """Score an upcoming (unplayed) season's schedule with the preseason priors model."""
     _run(["uv", "run", "python", "-m", "cfb_analytics.forecast", str(season)])
+
+
+@app.command()
+def compare() -> None:
+    """Build the standalone GRIDIRONIQ pages: comparison + stat guide + models explainer."""
+    _run(["uv", "run", "python", "dashboard/build_compare.py"])
+    # build_learn reads the compare_data.json that build_compare just wrote
+    _run(["uv", "run", "python", "dashboard/build_learn.py"])
 
 
 @app.command()
