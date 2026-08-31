@@ -4,6 +4,11 @@
 !.env.example
 .Renviron
 *.key
+# belt-and-suspenders: key-registration notes saved from the CFBD site (a "CFBD config.py"
+# scratch file once held the live key un-ignored — never let one slip in again)
+CFBD*
+*apikey*
+*api_key*.txt
 
 # --- Data (CFBD: gitignore raw data per §9 terms posture) ---
 data/
@@ -64,3 +69,10 @@ Thumbs.db
 
 /.quarto/
 **/*.quarto_ipynb
+
+# --- Prediction registry (tracked ON PURPOSE, overriding the *.csv ignore above) ---
+# predictions/ holds frozen, versioned model forecasts — derived outputs we authored, not raw
+# CFBD data, so publishing them is explicitly permitted by CFBD's terms. Each version dir is
+# immutable once committed; the git history is the tamper-evident timestamp.
+!predictions/
+!predictions/**

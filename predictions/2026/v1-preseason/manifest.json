@@ -1,0 +1,37 @@
+{
+  "version": "v1-preseason",
+  "label": "Original preseason forecast",
+  "season": 2026,
+  "season_type": "regular",
+  "model": "priors_winprob",
+  "model_language": "r (python parity-gated, rtol 1e-4)",
+  "generated_at": "2026-07-01T15:29:47-04:00",
+  "generated_at_basis": "file modification time of data/gold/forecast_2026.csv on the build machine; predates every 2026 game (season opened 2026-08-29)",
+  "frozen_at": "2026-08-31",
+  "source_commit": "5c0f4666b7e9bf37781d65139b444dcab6781e69",
+  "train_seasons": [2023, 2024],
+  "holdout_season": 2025,
+  "priors_season": 2025,
+  "inputs": "prior-season SP+ rating, mean net EPA/play, win rate per team (silver.silver_ratings_sp + gold.mart_team_efficiency); 2026 schedule from CFBD /games",
+  "scope": "FBS-vs-FBS regular-season games only (740 games, 136 teams); games against FCS opponents carry no prediction and are excluded from projected win totals and from scoring",
+  "immutable": true,
+  "scoring_rule": "a game counts toward this version's accuracy only if generated_at precedes kickoff; for v1-preseason that is every 2026 game",
+  "files": {
+    "forecast_2026.csv": {
+      "sha256": "012455c313564fa14a822f2f9b895c656a7b4b3bafb738aa2a64800bc7b7aeab",
+      "rows": 740,
+      "grain": "one row per game: game_id, week, start_date, neutral_site, home_team, away_team, home_win_prob, favored_team, favored_win_prob"
+    },
+    "forecast_2026_teams.csv": {
+      "sha256": "3bf8f22f2cde7119f244d2abdc55ba8d38c12328bbda887b84da3d3f1799ae4e",
+      "rows": 136,
+      "grain": "one row per team: games, projected_wins, projected_losses, avg_win_prob, projected_rank"
+    },
+    "coef__priors__r.csv": {
+      "sha256": "b2b13046343b3ac57bcaf931c86c92b22c674c66bc8ddf356828a9415db8d1cb",
+      "rows": 4,
+      "grain": "the exact fitted coefficients the forecast was scored with"
+    }
+  },
+  "terms_note": "Derived model output authored by this project — publishable under CFBD's terms (independently created predictions/projections are expressly permitted; no raw API data is included)."
+}
