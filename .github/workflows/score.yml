@@ -1,0 +1,45 @@
+# Scoreboard refresh: score every frozen forecast version against settled results and
+# republish docs/forecast.html. One CFBD API call per run (polite UA), daily during the
+# season (Aug-Dec) — ~30 calls/month against the 1,000/month free-tier quota. This is the
+# project's only scheduled collection; the warehouse/model pipeline stays on-demand.
+# Once the last predicted game settles, the page stops changing and commits stop naturally.
+name: score
+
+on:
+  schedule:
+    - cron: "20 9 * 8-12 *"   # 09:20 UTC daily Aug-Dec (early morning US — after late games)
+  workflow_dispatch: {}
+
+concurrency:
+  group: score
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  score:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Build the forecast scoreboard
+        env:
+          CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
+        run: uv run python dashboard/build_forecast.py
+
+      - name: Commit the refreshed page (only if it changed)
+        run: |
+          if git diff --quiet -- docs/forecast.html; then
+            echo "no change — nothing to commit"
+            exit 0
+          fi
+          git config user.name "gridironiq-bot"
+          git config user.email "gridironiq-bot@users.noreply.github.com"
+          git add docs/forecast.html
+          git commit -m "score: scoreboard refresh $(date -u +%F)"
+          git push
