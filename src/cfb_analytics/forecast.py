@@ -38,7 +38,7 @@ PREDICTIONS_DIR = REPO_ROOT / "predictions"
 
 
 def _schedule(season: int) -> pd.DataFrame:
-    key = os.getenv("CFBD_API_KEY")
+    key = os.getenv("CFBD_API_KEY", "").strip().lstrip("\ufeff")  # BOM-proof (see build_forecast)
     if not key:
         raise SystemExit("CFBD_API_KEY not set (.env) — needed to pull the schedule")
     resp = requests.get(CFBD_GAMES_URL, params={"year": str(season), "seasonType": "regular"},

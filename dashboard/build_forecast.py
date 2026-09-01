@@ -46,7 +46,9 @@ def _load_versions() -> list[dict]:
 
 def _results() -> pd.DataFrame:
     """Settled 2026 games from CFBD (best-effort: empty frame without a key / offline)."""
-    key = os.getenv("CFBD_API_KEY", "")
+    # strip a UTF-8 BOM: a BOM-prefixed key (Windows-written .env pasted into a CI secret)
+    # is invisible in every UI but breaks latin-1 header encoding
+    key = os.getenv("CFBD_API_KEY", "").strip().lstrip("\ufeff")
     cols = ["game_id", "home_points", "away_points", "completed"]
     if not key:
         print("  CFBD_API_KEY not set — building the page without results")
