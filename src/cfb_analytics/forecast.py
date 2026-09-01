@@ -7,11 +7,21 @@ rate), and scores it with the committed priors_winprob coefficients (R and Pytho
 applying them is language-agnostic). Writes gold.forecast_<season> + a CSV under data/gold/.
 
     uv run python -m cfb_analytics.forecast 2026
+    uv run python -m cfb_analytics.forecast 2026 --freeze v2-week3
+
+--freeze LABEL additionally seals the run into predictions/<season>/<LABEL>/ (CSVs + fitted
+coefficients + a manifest with SHA-256 hashes). Registry versions are immutable: an existing
+LABEL is refused, never overwritten — improve the model, freeze a NEW version. The scoreboard
+(dashboard/build_forecast.py) scores every version forward-only from its generated_at.
 """
 from __future__ import annotations
 
+import hashlib
+import json
 import os
+import subprocess
 import sys
+from datetime import datetime, timezone
 
 import duckdb
 import numpy as np
@@ -22,7 +32,9 @@ from .config import DUCKDB_PATH, REPO_ROOT
 from .db import read_only_conn
 
 CFBD_GAMES_URL = "https://api.collegefootballdata.com/games"
+CFBD_UA = "cfb-analytics/1.0 (portfolio; +https://github.com/Steve27M/cfb-analytics)"
 GOLD_DIR = REPO_ROOT / "data" / "gold"
+PREDICTIONS_DIR = REPO_ROOT / "predictions"
 
 
 def _schedule(season: int) -> pd.DataFrame:
@@ -30,7 +42,8 @@ def _schedule(season: int) -> pd.DataFrame:
     if not key:
         raise SystemExit("CFBD_API_KEY not set (.env) — needed to pull the schedule")
     resp = requests.get(CFBD_GAMES_URL, params={"year": str(season), "seasonType": "regular"},
-                        headers={"Authorization": f"Bearer {key}"}, timeout=60)
+                        headers={"Authorization": f"Bearer {key}", "User-Agent": CFBD_UA},
+                        timeout=60)
     resp.raise_for_status()
     games = resp.json()
     return pd.DataFrame([{
@@ -120,6 +133,68 @@ def forecast(season: int) -> pd.DataFrame:
     return sched
 
 
+def _sha256(path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def freeze(season: int, label: str) -> None:
+    """Seal the just-written forecast into the immutable predictions/ registry."""
+    dst = PREDICTIONS_DIR / str(season) / label
+    if dst.exists():
+        raise SystemExit(f"refusing to overwrite existing registry version: {dst}\n"
+                         "Registry versions are immutable — pick a new label.")
+    src_games = GOLD_DIR / f"forecast_{season}.csv"
+    src_teams = GOLD_DIR / f"forecast_{season}_teams.csv"
+    if not (src_games.exists() and src_teams.exists()):
+        raise SystemExit("no forecast CSVs to freeze — run the forecast first")
+    dst.mkdir(parents=True)
+    files = {}
+    for src in (src_games, src_teams):
+        (dst / src.name).write_bytes(src.read_bytes())
+        files[src.name] = {"sha256": _sha256(dst / src.name),
+                           "rows": sum(1 for _ in open(dst / src.name, encoding="utf-8")) - 1}
+    con = read_only_conn()
+    try:
+        coef = con.execute("""
+            select model, term, estimate, std_error, statistic, p_value, odds_ratio, language
+            from gold.model_coefficients
+            where model = 'priors_winprob' and language = 'r'
+        """).fetch_df()
+    finally:
+        con.close()
+    coef.to_csv(dst / "coef__priors__r.csv", index=False)
+    files["coef__priors__r.csv"] = {"sha256": _sha256(dst / "coef__priors__r.csv"),
+                                    "rows": len(coef)}
+    try:
+        sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=REPO_ROOT, capture_output=True,
+                             text=True, check=True).stdout.strip()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        sha = None
+    manifest = {
+        "version": label,
+        "season": season,
+        "season_type": "regular",
+        "model": "priors_winprob",
+        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "frozen_at": datetime.now(timezone.utc).date().isoformat(),
+        "source_commit": sha,
+        "priors_season": season - 1,
+        "scope": "FBS-vs-FBS regular-season games only; FCS opponents carry no prediction",
+        "immutable": True,
+        "scoring_rule": ("a game counts toward this version's accuracy only if generated_at "
+                         "precedes kickoff"),
+        "files": files,
+    }
+    (dst / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    print(f"  frozen -> {dst.relative_to(REPO_ROOT)} (commit it to seal the timestamp)")
+
+
 if __name__ == "__main__":
-    yr = int(sys.argv[1]) if len(sys.argv) > 1 else 2026
+    args = [a for a in sys.argv[1:] if a != "--freeze"]
+    yr = int(args[0]) if args and args[0].isdigit() else 2026
     forecast(yr)
+    if "--freeze" in sys.argv:
+        idx = sys.argv.index("--freeze")
+        if idx + 1 >= len(sys.argv):
+            raise SystemExit("--freeze needs a label, e.g. --freeze v2-week3")
+        freeze(yr, sys.argv[idx + 1])

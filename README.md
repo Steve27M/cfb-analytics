@@ -10,6 +10,7 @@ Python**, and renders a **Quarto dashboard** that evaluates the data and the mod
 >
 > 🏈 **Explore the standalone GRIDIRONIQ pages:**
 > [**Compare any two teams**](https://steve27m.github.io/cfb-analytics/compare.html) ·
+> [**2026 Forecast Scoreboard**](https://steve27m.github.io/cfb-analytics/forecast.html) ·
 > [**Stat guide**](https://steve27m.github.io/cfb-analytics/glossary.html) ·
 > [**The models**](https://steve27m.github.io/cfb-analytics/models.html) (how they work + how well they perform).
 >
@@ -110,7 +111,22 @@ uv run python run.py parity     # Python parity fits + market-edge eval + load_r
 uv run python run.py dashboard  # prepare feeds, render Quarto -> docs/, refresh preview PNGs
 uv run python run.py compare    # build the standalone GRIDIRONIQ pages (compare/glossary/models)
 uv run python run.py forecast 2026   # score an upcoming season's schedule with the priors model
+uv run python run.py forecast 2026 --freeze v2-week5  # ...and seal it as a new registry version
+uv run python run.py score      # score every frozen version vs settled results -> docs/forecast.html
 ```
+
+## Predictions on the record — the 2026 forecast scoreboard
+
+The preseason model's full 2026 forecast (740 FBS-vs-FBS game probabilities, 136 team win
+projections) was generated on **2026-07-01** and is **frozen verbatim** under
+[`predictions/2026/v1-preseason/`](predictions/2026/v1-preseason/) with a SHA-256 manifest —
+the commit history proves the predictions predate the games. As models improve during the season,
+each new version is frozen beside it (never over it) and scored **forward-only from its freeze
+date** (the before-kickoff rule: no version is graded on a game it could have known the result
+of). The [**Forecast Scoreboard**](https://steve27m.github.io/cfb-analytics/forecast.html) tracks
+every version against actual results and the naive baselines all season; at the end of the year
+the original preseason projections stand against the final standings, untouched. See
+[`predictions/README.md`](predictions/README.md) for the registry contract.
 
 ## Case study — engineering & modeling decisions
 

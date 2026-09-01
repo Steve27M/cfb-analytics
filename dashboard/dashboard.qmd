@@ -54,6 +54,10 @@ PLAYER_SEASON <- 2024
 their 2025 season head-to-head (SP+, EPA, efficiency, player leaders) with a neutral-field matchup
 projection and 2026 win forecast.
 
+🔮 **[2026 Forecast Scoreboard →](forecast.html)** — the model's preseason predictions for every
+2026 FBS game, frozen in git on July 1 before the season, scored live against actual results all
+year — originals vs updated models vs reality.
+
 📖 **[Stat Guide →](glossary.html)** — a plain-English data dictionary for every metric, with the
 2025 FBS range for each. &nbsp;•&nbsp; 🧪 **[The Models →](models.html)** — how the projections
 work and how well they perform: an interactive win-probability curve, a real held-out calibration

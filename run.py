@@ -149,9 +149,20 @@ def parity() -> None:
 
 
 @app.command()
-def forecast(season: int = typer.Argument(2026, help="Future season to forecast.")) -> None:
+def forecast(season: int = typer.Argument(2026, help="Future season to forecast."),
+             freeze: str = typer.Option(None, help="Also seal this run into predictions/<season>/"
+                                                   "<label>/ (immutable registry version).")) -> None:
     """Score an upcoming (unplayed) season's schedule with the preseason priors model."""
-    _run(["uv", "run", "python", "-m", "cfb_analytics.forecast", str(season)])
+    cmd = ["uv", "run", "python", "-m", "cfb_analytics.forecast", str(season)]
+    if freeze:
+        cmd += ["--freeze", freeze]
+    _run(cmd)
+
+
+@app.command()
+def score() -> None:
+    """Score every frozen forecast version against settled results -> docs/forecast.html."""
+    _run(["uv", "run", "python", "dashboard/build_forecast.py"])
 
 
 @app.command()

@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GRIDIRONIQ — 2026 Forecast Scoreboard</title>
+<meta name="description" content="The project's 2026 college-football predictions, frozen in git before the season — scored live against actual results all year. Original preseason forecast vs updated models vs reality.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Saira+Condensed:wght@500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --a:#3ddc84; --a2:#1c7a49; --aText:#04120a;
+    --bg:#06070a; --text:#f3f6fb; --sub:#8a96a8; --border:rgba(255,255,255,.09);
+    --panel:#12151d; --panel2:#0c0e14; --good:#3ddc84; --bad:#ff6b6b; --warn:#ffd166;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'Space Grotesk',sans-serif;
+    background:radial-gradient(140% 55% at 50% 0%,color-mix(in srgb,var(--a) 15%,var(--bg)) 0%,var(--bg) 52%);
+    background-attachment:fixed;padding-bottom:70px;}
+  a{color:inherit;text-decoration:none;}
+  ::-webkit-scrollbar{width:11px;height:11px;}
+  ::-webkit-scrollbar-track{background:#0c0e13;}
+  ::-webkit-scrollbar-thumb{background:#242833;border-radius:6px;}
+  .wrap{max-width:1120px;margin:0 auto;padding:0 26px;}
+  .nav{position:sticky;top:0;z-index:40;backdrop-filter:blur(14px);background:rgba(8,9,13,.82);border-bottom:1px solid var(--border);}
+  .nav .in{display:flex;align-items:center;gap:20px;padding:12px 26px;flex-wrap:wrap;}
+  .brand{display:flex;align-items:center;gap:9px;}
+  .brand .bar{width:9px;height:26px;border-radius:3px;background:linear-gradient(var(--a),var(--a2));}
+  .brand .txt{font:800 15px 'Saira Condensed';letter-spacing:.14em;}
+  .navlinks{display:flex;gap:4px;flex-wrap:wrap;margin-left:auto;}
+  .navlinks a{font:600 12px 'Space Grotesk';letter-spacing:.04em;color:var(--sub);padding:7px 12px;border-radius:8px;}
+  .navlinks a:hover{color:var(--text);background:var(--panel);}
+  .navlinks a.active{color:var(--aText);background:var(--a);}
+  .hero{padding:44px 0 8px;}
+  .hero .eyebrow{font:600 12px 'Space Grotesk';letter-spacing:.22em;color:var(--a);text-transform:uppercase;}
+  .hero h1{font:400 clamp(40px,6vw,68px)/.92 'Anton';text-transform:uppercase;margin:10px 0 0;}
+  .hero p{font:400 16px/1.6 'Space Grotesk';color:var(--sub);max-width:760px;margin:14px 0 0;}
+  .hero p b{color:var(--text);font-weight:600;}
+  .sec{display:flex;align-items:center;gap:12px;margin:38px 0 16px;}
+  .sec h2{font:400 22px 'Anton';letter-spacing:.02em;text-transform:uppercase;margin:0;}
+  .sec .line{flex:1;height:1px;background:var(--border);}
+  .statusbar{display:flex;gap:10px;flex-wrap:wrap;margin:24px 0 0;}
+  .pill{font:600 12px 'JetBrains Mono';color:var(--sub);border:1px solid var(--border);background:var(--panel);
+    border-radius:999px;padding:7px 14px;}
+  .pill b{color:var(--text);}
+  .pill.final{color:var(--aText);background:var(--a);border-color:var(--a);}
+  .card{border-radius:16px;border:1px solid var(--border);background:var(--panel);padding:18px 20px;}
+  .rules{font:400 13.5px/1.65 'Space Grotesk';color:var(--sub);margin-top:22px;}
+  .rules b{color:var(--text);font-weight:600;}
+  .rules .tick{color:var(--a);font-weight:700;}
+  .vgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;}
+  .vcard .vhead{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;}
+  .vcard .vname{font:400 20px 'Anton';text-transform:uppercase;}
+  .vcard .vtag{font:700 10px 'Space Grotesk';letter-spacing:.08em;text-transform:uppercase;padding:4px 9px;border-radius:999px;}
+  .vtag.orig{color:var(--aText);background:var(--a);}
+  .vtag.upd{color:#04120a;background:#7cc4ff;}
+  .vcard .vwhen{font:500 11px 'JetBrains Mono';color:var(--sub);margin-top:4px;}
+  .mrow{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px;}
+  .metric{background:var(--panel2);border:1px solid var(--border);border-radius:12px;padding:12px 14px;}
+  .metric .k{font:600 10px 'Space Grotesk';letter-spacing:.1em;text-transform:uppercase;color:var(--sub);}
+  .metric .v{font:700 24px 'Saira Condensed';margin-top:4px;}
+  .metric .base{font:500 11px 'JetBrains Mono';color:var(--sub);margin-top:4px;}
+  .metric .base.beat{color:var(--good);}
+  .metric .base.lost{color:var(--bad);}
+  .wkbars{margin-top:16px;}
+  .wkbars .lbl{font:600 10px 'Space Grotesk';letter-spacing:.1em;text-transform:uppercase;color:var(--sub);margin-bottom:8px;}
+  .wkrow{display:flex;align-items:center;gap:9px;margin:5px 0;}
+  .wkrow .wk{font:600 11px 'JetBrains Mono';color:var(--sub);width:34px;}
+  .wkrow .track{flex:1;height:9px;border-radius:5px;background:var(--panel2);border:1px solid var(--border);overflow:hidden;}
+  .wkrow .fill{height:100%;background:linear-gradient(90deg,var(--a2),var(--a));}
+  .wkrow .val{font:600 11px 'JetBrains Mono';width:88px;text-align:right;}
+  .toolbar{display:flex;gap:12px;align-items:center;margin:0 0 14px;flex-wrap:wrap;}
+  .search{flex:1;min-width:200px;display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:10px 15px;}
+  .search input{flex:1;background:none;border:none;outline:none;color:var(--text);font:500 14px 'Space Grotesk';}
+  .search input::placeholder{color:var(--sub);}
+  select{background:var(--panel);border:1px solid var(--border);border-radius:10px;color:var(--text);
+    font:600 12px 'Space Grotesk';padding:10px 12px;outline:none;}
+  .tablewrap{overflow-x:auto;border-radius:16px;border:1px solid var(--border);}
+  table{border-collapse:collapse;width:100%;min-width:640px;background:var(--panel);}
+  th{font:700 10px 'Space Grotesk';letter-spacing:.1em;text-transform:uppercase;color:var(--sub);
+    text-align:left;padding:12px 14px;border-bottom:1px solid var(--border);white-space:nowrap;}
+  th.num,td.num{text-align:right;font-family:'JetBrains Mono';}
+  td{font:500 13px 'Space Grotesk';padding:10px 14px;border-bottom:1px solid var(--border);white-space:nowrap;}
+  tr:last-child td{border-bottom:none;}
+  td.team{font-weight:600;}
+  td .rk{color:var(--sub);font:600 11px 'JetBrains Mono';margin-right:9px;}
+  .diffpos{color:var(--good);} .diffneg{color:var(--bad);}
+  .chip{font:700 10px 'Space Grotesk';letter-spacing:.06em;text-transform:uppercase;padding:3px 9px;border-radius:999px;}
+  .chip.hit{color:var(--aText);background:var(--a);}
+  .chip.miss{color:#160404;background:var(--bad);}
+  .chip.wait{color:var(--sub);border:1px solid var(--border);}
+  .gamecard{display:flex;align-items:center;gap:14px;padding:11px 16px;border-bottom:1px solid var(--border);flex-wrap:wrap;}
+  .gamecard:last-child{border-bottom:none;}
+  .gamecard .dt{font:600 10px 'JetBrains Mono';color:var(--sub);width:74px;}
+  .gamecard .match{flex:1;min-width:230px;font:600 13.5px 'Space Grotesk';}
+  .gamecard .match .fav{color:var(--a);}
+  .gamecard .score{font:700 13px 'JetBrains Mono';width:64px;text-align:center;}
+  .gamecard .prob{font:600 11.5px 'JetBrains Mono';color:var(--sub);width:150px;}
+  .empty{text-align:center;color:var(--sub);font:500 14px 'Space Grotesk';padding:36px;}
+  .finalband{margin-top:14px;border-radius:16px;border:1px solid var(--a);background:color-mix(in srgb,var(--a) 10%,var(--panel));
+    padding:16px 20px;font:500 14px/1.6 'Space Grotesk';}
+  footer{margin-top:44px;font:500 12px/1.7 'Space Grotesk';color:var(--sub);}
+  footer a{color:var(--a);}
+  @media(max-width:760px){.mrow{grid-template-columns:1fr 1fr;}}
+</style>
+</head>
+<body>
+<div class="nav"><div class="in">
+  <a class="brand" href="index.html"><span class="bar"></span><span class="txt">GRIDIRON<span style="color:var(--a);">IQ</span></span></a>
+  <div class="navlinks">
+    <a href="compare.html">Compare Teams</a>
+    <a href="forecast.html" class="active">2026 Forecast</a>
+    <a href="glossary.html">Stat Guide</a>
+    <a href="models.html">The Models</a>
+    <a href="index.html">Dashboard</a>
+    <a href="https://github.com/Steve27M/cfb-analytics" target="_blank" rel="noopener">GitHub ↗</a>
+  </div>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Predictions on the record</div>
+    <h1>2026 Forecast Scoreboard</h1>
+    <p>On <b>July 1, 2026</b> — before a single game — this project's preseason model predicted every
+    FBS-vs-FBS game of the 2026 season and froze those predictions in
+    <a href="https://github.com/Steve27M/cfb-analytics/tree/main/predictions" target="_blank" rel="noopener" style="color:var(--a);">the git history</a>,
+    where they can't be quietly edited. This page scores them against reality all season. The models
+    keep improving; the originals stay untouched — and at the end of the year, they answer for themselves.</p>
+    <div class="statusbar" id="status"></div>
+  </div>
+
+  <div class="rules card">
+    <span class="tick">✓</span> <b>Frozen means frozen.</b> Every forecast version is an immutable,
+    SHA-256-manifested directory sealed by a git commit — the commit date proves the predictions predate the games.
+    &nbsp;<span class="tick">✓</span> <b>Before-kickoff rule.</b> An updated model is scored only on games played
+    <i>after</i> it was created — no version ever gets credit for a game it could have known the result of.
+    &nbsp;<span class="tick">✓</span> <b>Scope.</b> FBS-vs-FBS regular-season games only; games against FCS
+    opponents carry no prediction and don't count for or against any version.
+  </div>
+
+  <div class="sec"><h2>Model accuracy</h2><span class="line"></span></div>
+  <div class="vgrid" id="versions"></div>
+
+  <div class="sec"><h2>Projected wins vs reality</h2><span class="line"></span></div>
+  <div id="finalband"></div>
+  <div class="toolbar">
+    <div class="search"><span style="color:var(--sub);font-size:15px;">🔎</span>
+      <input id="tq" type="text" placeholder="Find a team…" autocomplete="off"></div>
+    <select id="tsort">
+      <option value="rank">Sort: original projection</option>
+      <option value="aw">Sort: actual wins</option>
+      <option value="diff">Sort: beat / missed projection</option>
+      <option value="name">Sort: team A–Z</option>
+    </select>
+  </div>
+  <div class="tablewrap"><table id="teamtable"></table></div>
+
+  <div class="sec"><h2>Game by game</h2><span class="line"></span></div>
+  <div class="toolbar">
+    <select id="gweek"></select>
+    <select id="gfilter">
+      <option value="all">All games</option>
+      <option value="settled">Settled only</option>
+      <option value="upcoming">Upcoming only</option>
+    </select>
+    <span class="pill" id="gcount"></span>
+  </div>
+  <div class="card" style="padding:0;" id="games"></div>
+
+  <footer>
+    Predictions are this project's own derived model outputs, frozen under
+    <a href="https://github.com/Steve27M/cfb-analytics/tree/main/predictions" target="_blank" rel="noopener">predictions/</a>
+    and scored by <code>dashboard/build_forecast.py</code>. Results and schedule: CollegeFootballData.com
+    (raw data gitignored, never republished). Descriptive analytics — not betting advice.
+    Curious how the model works? <a href="models.html">Read about the models →</a>
+  </footer>
+</div>
+
+<script>
+const DATA = __FORECAST_DATA__;
+const fmtPct = v => (v*100).toFixed(1) + '%';
+const teamsById = {};
+
+/* ---- status bar ---- */
+(function(){
+  const s = [];
+  s.push(`<span class="pill">Season <b>${DATA.season}</b></span>`);
+  s.push(`<span class="pill"><b>${DATA.settled}</b> of <b>${DATA.total}</b> predicted games settled</span>`);
+  s.push(`<span class="pill">${DATA.versions.length} frozen version${DATA.versions.length>1?'s':''}</span>`);
+  if(DATA.season_complete) s.push(`<span class="pill final">SEASON COMPLETE — FINAL VERDICT BELOW</span>`);
+  if(!DATA.results_available) s.push(`<span class="pill">results feed unavailable at build time</span>`);
+  s.push(`<span class="pill">updated ${DATA.built_at.slice(0,10)}</span>`);
+  document.getElementById('status').innerHTML = s.join('');
+})();
+
+/* ---- version accuracy cards ---- */
+(function(){
+  const el = document.getElementById('versions');
+  el.innerHTML = DATA.versions.map((v,i)=>{
+    const isOrig = v.version === DATA.original;
+    const o = v.overall || {};
+    const when = `predicted ${v.generated_at.slice(0,10)} · ${v.n_games} games forecast`;
+    let body;
+    if(!o.n){
+      body = `<div class="empty">No settled games in this version's window yet — scores appear as games finish.</div>`;
+    } else {
+      const accBeat = o.acc >= o.home_acc;
+      const brBeat = o.brier <= DATA.coinflip_brier;
+      body = `
+      <div class="mrow">
+        <div class="metric"><div class="k">Winner picked</div><div class="v">${fmtPct(o.acc)}</div>
+          <div class="base ${accBeat?'beat':'lost'}">${accBeat?'beats':'trails'} always-pick-home ${fmtPct(o.home_acc)}</div></div>
+        <div class="metric"><div class="k">Brier score</div><div class="v">${o.brier.toFixed(3)}</div>
+          <div class="base ${brBeat?'beat':'lost'}">coin flip = 0.250 · lower is better</div></div>
+        <div class="metric"><div class="k">Log loss</div><div class="v">${o.logloss.toFixed(3)}</div>
+          <div class="base">coin flip = 0.693 · ${o.n} games scored</div></div>
+      </div>
+      ${weekBars(v.weekly)}`;
+    }
+    return `<div class="card vcard">
+      <div class="vhead"><span class="vname">${v.label}</span>
+        <span class="vtag ${isOrig?'orig':'upd'}">${isOrig?'Original — frozen':'Updated model'}</span></div>
+      <div class="vwhen">${when}${isOrig?'':' · scored forward-only from its freeze date'}</div>
+      ${body}</div>`;
+  }).join('');
+  if(DATA.versions.length === 1){
+    el.innerHTML += `<div class="card vcard"><div class="vhead"><span class="vname">Updated model</span>
+      <span class="vtag upd">Coming in-season</span></div>
+      <div class="vwhen">as the models improve during 2026, each new version is frozen and scored here beside the original</div>
+      <div class="empty">The original stands alone so far — improvements will be judged on the same terms.</div></div>`;
+  }
+})();
+
+function weekBars(weekly){
+  if(!weekly || !weekly.length) return '';
+  const max = Math.max(...weekly.map(w=>w.brier), 0.30);
+  return `<div class="wkbars"><div class="lbl">Brier by week (shorter bar = sharper forecast)</div>` +
+    weekly.map(w=>`<div class="wkrow"><span class="wk">W${w.week}</span>
+      <div class="track"><div class="fill" style="width:${Math.min(100, w.brier/max*100).toFixed(1)}%"></div></div>
+      <span class="val">${w.brier.toFixed(3)} · ${w.n}g</span></div>`).join('') + `</div>`;
+}
+
+/* ---- team table ---- */
+(function(){
+  const hasUpd = DATA.teams.some(t=>'pwl' in t);
+  const done = DATA.season_complete;
+  if(done){
+    const mae = DATA.teams.reduce((s,t)=>s+Math.abs(t.pw-t.aw),0)/DATA.teams.length;
+    const within1 = DATA.teams.filter(t=>Math.abs(t.pw-t.aw)<=1).length;
+    document.getElementById('finalband').innerHTML =
+      `<div class="finalband"><b>Final verdict:</b> across ${DATA.teams.length} teams the original preseason
+      projection missed actual wins by <b>${mae.toFixed(2)} wins per team</b> on average, and landed within
+      one win for <b>${within1}</b> of ${DATA.teams.length} teams. Every number it is judged on was committed
+      to git on July&nbsp;1 — before the season began.</div>`;
+  }
+  function render(){
+    const q = document.getElementById('tq').value.trim().toLowerCase();
+    const sort = document.getElementById('tsort').value;
+    let rows = DATA.teams.filter(t=>!q || t.team.toLowerCase().includes(q));
+    const key = {rank:t=>t.rank, aw:t=>-t.aw, diff:t=>-(t.aw-t.pw), name:t=>t.team}[sort]
+      || (t=>t.rank);
+    rows = rows.slice().sort((a,b)=>{const ka=key(a),kb=key(b);return ka<kb?-1:ka>kb?1:0;});
+    const head = `<tr><th>Team</th><th class="num">Original proj. W</th>${hasUpd?'<th class="num">Updated proj. W</th>':''}
+      <th class="num">Actual</th><th class="num">Games left</th><th class="num">${done?'Final miss':'vs projection'}</th></tr>`;
+    document.getElementById('teamtable').innerHTML = head + rows.map(t=>{
+      const pace = t.aw - t.pw * ((t.aw+t.al) / t.g || 0);
+      const diff = done ? (t.aw - t.pw) : pace;
+      const cls = diff >= 0 ? 'diffpos' : 'diffneg';
+      const dtxt = (t.aw+t.al)===0 ? '—' : `${diff>=0?'+':''}${diff.toFixed(1)}`;
+      return `<tr><td class="team"><span class="rk">#${t.rank}</span>${t.team}</td>
+        <td class="num">${t.pw.toFixed(1)} / ${t.g}</td>
+        ${hasUpd?`<td class="num">${'pwl' in t?t.pwl.toFixed(1):'—'}</td>`:''}
+        <td class="num">${t.aw}–${t.al}</td><td class="num">${t.left}</td>
+        <td class="num ${cls}">${dtxt}</td></tr>`;
+    }).join('');
+  }
+  document.getElementById('tq').addEventListener('input', render);
+  document.getElementById('tsort').addEventListener('change', render);
+  render();
+})();
+
+/* ---- game explorer ---- */
+(function(){
+  const weeks = [...new Set(DATA.games.map(g=>g.wk))].sort((a,b)=>a-b);
+  const wsel = document.getElementById('gweek');
+  const settledWeeks = DATA.games.filter(g=>'hw' in g).map(g=>g.wk);
+  const defWeek = settledWeeks.length ? Math.max(...settledWeeks) : weeks[0];
+  wsel.innerHTML = `<option value="all">All weeks</option>` +
+    weeks.map(w=>`<option value="${w}" ${w===defWeek?'selected':''}>Week ${w}</option>`).join('');
+  function render(){
+    const wk = wsel.value, f = document.getElementById('gfilter').value;
+    let gs = DATA.games.filter(g=> (wk==='all' || g.wk===+wk));
+    if(f==='settled') gs = gs.filter(g=>'hw' in g);
+    if(f==='upcoming') gs = gs.filter(g=>!('hw' in g));
+    document.getElementById('gcount').textContent = `${gs.length} games`;
+    document.getElementById('games').innerHTML = gs.length ? gs.map(g=>{
+      const favHome = g.p >= 0.5;
+      const fav = favHome ? g.home : g.away, favP = favHome ? g.p : 1-g.p;
+      let right = '', score = '<span style="color:var(--sub);">—</span>';
+      if('hw' in g){
+        const hit = (favHome === g.hw);
+        right = `<span class="chip ${hit?'hit':'miss'}">${hit?'model right':'model wrong'}</span>`;
+        score = `${g.hp}–${g.ap}`;
+      } else {
+        right = `<span class="chip wait">not played</span>`;
+      }
+      const upd = ('pl' in g && g.pl !== g.p) ? ` · upd ${fmtPct(favHome?g.pl:1-g.pl)}` : '';
+      return `<div class="gamecard"><span class="dt">${g.date.slice(5)}${g.neutral?' · N':''}</span>
+        <span class="match">${g.away} at <span class="${favHome?'fav':''}">${g.home}</span></span>
+        <span class="score">${score}</span>
+        <span class="prob">${fav} ${fmtPct(favP)}${upd}</span>${right}</div>`;
+    }).join('') : `<div class="empty">No games match that filter.</div>`;
+  }
+  wsel.addEventListener('change', render);
+  document.getElementById('gfilter').addEventListener('change', render);
+  render();
+})();
+</script>
+</body>
+</html>
