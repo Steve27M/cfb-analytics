@@ -48,6 +48,7 @@ def load() -> None:
                       ignore_index=True)            # play-grain RYOE/CPOE residuals
     game_preds = _read_glob("gamepred__game__*.csv")     # in-season game win-prob predictions
     priors_preds = _read_glob("gamepred__priors__*.csv")  # preseason priors-model predictions
+    inseason_preds = _read_glob("gamepred__inseason__*.csv")  # in-season update-model predictions
     archetypes = _read_glob("pred__archetype__*.csv")   # team-season PC coords + cluster (M6)
     shrinkage = _read_glob("pred__shrinkage__*.csv")    # per-rusher raw vs shrunk RYOE (M7)
     recruiting = _read_glob("pred__recruiting__*.csv")  # team-season production vs recruiting (M8)
@@ -65,6 +66,7 @@ def load() -> None:
             ("predictions", preds),
             ("game_predictions", game_preds),
             ("priors_predictions", priors_preds),
+            ("inseason_predictions", inseason_preds),
             ("team_archetypes", archetypes),
             ("player_shrinkage", shrinkage),
             ("recruiting_performance", recruiting),

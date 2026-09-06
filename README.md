@@ -115,7 +115,8 @@ uv run python run.py dashboard  # prepare feeds, render Quarto -> docs/, refresh
 uv run python run.py compare    # build the standalone GRIDIRONIQ pages (compare/glossary/models)
 uv run python run.py forecast 2026   # score an upcoming season's schedule with the priors model
 uv run python run.py forecast 2026 --freeze v2-week5  # ...and seal it as a new registry version
-uv run python run.py score      # score every frozen version vs settled results -> docs/forecast.html
+uv run python run.py inseason --freeze v2-inseason   # seal the in-season update model + first snapshot
+uv run python run.py score      # snapshot if new results settled, score every version -> docs/forecast.html
 ```
 
 ## Predictions on the record — the 2026 forecast scoreboard
@@ -130,6 +131,20 @@ of). The [**Forecast Scoreboard**](https://steve27m.github.io/cfb-analytics/fore
 every version against actual results and the naive baselines all season; at the end of the year
 the original preseason projections stand against the final standings, untouched. See
 [`predictions/README.md`](predictions/README.md) for the registry contract.
+
+**The updated model lives beside the original.** `predictions/2026/v2-inseason/` seals an
+**in-season update model** — a Bayesian ridge on scoring margins whose prior mean is each team's
+preseason strength (the priors model's own linear predictor, converted to points). The prior is
+worth *k* games of evidence (*k* = 2, chosen on 2024); every settled FBS-vs-FBS game then pulls a
+team toward its opponent-adjusted margins, and a two-parameter logistic map turns the predicted
+margin into a win probability. Held out on 2025 it scores **Brier 0.174 vs 0.205** for the
+preseason-only model on the same 740 games (AUC 0.81). Because it needs only the sealed
+coefficients and the season's scores — no play-by-play, no warehouse — the scoreboard refresh
+applies it in CI: whenever new results have settled it writes an immutable, timestamped
+**snapshot** of the re-forecast under `v2-inseason/snapshots/`, and the page scores every
+snapshot forward-only plus the *live series* (for each game, the latest snapshot that predates
+its kickoff — what a reader following the season actually saw). Built in R and Python like every
+other model here; the ridge weight, margin scale and home-field estimate sit in the parity gate.
 
 ## Case study — engineering & modeling decisions
 
@@ -198,6 +213,8 @@ range — R, Python, and SQL each doing what they're best at, cross-checked agai
 Done: ingestion (API + ethical scrape) → medallion → Kimball star + SCD2 → book models **M1–M8**
 (R + Python) → in-season + preseason win-probability models → **live 2026-season forecast** (the
 priors model applied to CFBD's 2026 schedule) → Quarto dashboard live on GitHub Pages → **frozen
-prediction registry + self-updating 2026 scoreboard** (in-season GitHub Actions refresh three times a day).
+prediction registry + self-updating 2026 scoreboard** (in-season GitHub Actions refresh three times a day)
+→ **in-season update model** (preseason prior + season-to-date margins, re-forecast and sealed as a
+snapshot after every game day).
 Deferred but pre-structured: full **CI** (lint + `dbt build`) and a **BigQuery** push of the gold
 tables. See [`PROJECT_PLAN.md`](PROJECT_PLAN.md) for the full plan.

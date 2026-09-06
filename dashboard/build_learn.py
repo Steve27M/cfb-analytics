@@ -286,6 +286,7 @@ def build_models(teams: list[dict]) -> dict:
                  "calib": _calibration("game")},
         "market": _market_edge(),
         "priors": {"metrics": priors},
+        "inseason": {"metrics": _metrics("inseason")},
         "recruiting": _metrics("recruiting"),
         "stability": _metrics("stability"),
         "cpoe": _metrics("cpoe"),

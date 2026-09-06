@@ -1,0 +1,55 @@
+{
+  "version": "v2-inseason",
+  "label": "In-season updated forecast",
+  "kind": "series",
+  "season": 2026,
+  "season_type": "regular",
+  "model": "inseason_winprob",
+  "model_language": "r (python parity-gated, rtol 1e-4)",
+  "generated_at": "2026-09-06T11:24:09+00:00",
+  "frozen_at": "2026-09-06",
+  "source_commit": "90bb76bf579cfd5835736bb690ba320855212ae7",
+  "method": "Bayesian ridge on scoring margins: every team starts at its preseason strength (the priors model's linear predictor, converted to points by gamma) and moves toward its season-to-date opponent-adjusted margins; ridge_k is how many games of evidence the preseason prior is worth. Win probability = logistic(intercept + slope x predicted margin).",
+  "train_seasons": [
+    2024
+  ],
+  "holdout_season": 2025,
+  "holdout_metrics": {
+    "brier": 0.1742,
+    "brier_priors": 0.2053,
+    "brier_naive": 0.2416,
+    "accuracy": 0.7432,
+    "accuracy_priors": 0.6797,
+    "auc": 0.8107,
+    "log_loss": 0.5205,
+    "brier_from_game4": 0.1774,
+    "brier_priors_from_game4": 0.2169,
+    "n_test": 740.0
+  },
+  "hyperparameters": {
+    "ridge_k": 2.0,
+    "gamma": 12.108733233178018,
+    "home_adv": 3.7552454989003694
+  },
+  "coefficients": {
+    "(Intercept)": -0.0735309522036669,
+    "pred_margin": 0.0991490499799772
+  },
+  "priors_season": 2025,
+  "schedule_from": "v1-preseason",
+  "scope": "the frozen preseason game list (FBS-vs-FBS regular season); only games between two rated teams count as evidence, so FCS results never move a rating",
+  "snapshot_policy": "snapshots/<UTC timestamp>/ is written by the scoreboard refresh only when new results have settled since the previous snapshot; each snapshot is immutable and is scored forward-only from its own generated_at. The live series takes, for every game, the latest snapshot that predates its kickoff.",
+  "immutable": true,
+  "files": {
+    "coef__inseason__r.csv": {
+      "sha256": "1a53812014aecea2de0bcf15e3a8d4efbf829b10858b51b9082ffde2adf8d0fa",
+      "rows": 5,
+      "grain": "fitted terms: (Intercept), pred_margin, ridge_k, gamma, home_adv"
+    },
+    "team_prior_strength.csv": {
+      "sha256": "5d7deccd2d77a7d11e5d1e2ea28a538d48eb95fa1d09d048d983e5e81130060e",
+      "rows": 136,
+      "grain": "one row per team: preseason strength (logit, centered), prior_rating (points = gamma x strength), prior_rank"
+    }
+  }
+}

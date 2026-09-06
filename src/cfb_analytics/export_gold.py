@@ -245,6 +245,65 @@ FEEDS: dict[str, str] = {
           and h.sp_rating is not null and a.sp_rating is not null
           and h.net_epa is not null and a.net_epa is not null
     """,
+    # In-season update model feeds (team_priors + inseason_games). The in-season model starts
+    # every team at its PRESEASON strength (the priors model's linear predictor, built from the
+    # prior-season features below) and updates it with season-to-date scoring margins. Rows are
+    # keyed by the season being predicted, so season = ratings season + 1: the 2026 rows are the
+    # priors for the live forecast season.
+    "team_priors": """
+        with team_eff as (
+            select team, season,
+                   avg(net_epa_per_play) as net_epa,
+                   avg(case when won then 1.0 else 0.0 end) as win_pct
+            from gold.mart_team_efficiency
+            group by team, season
+        )
+        select
+            r.season + 1                                            as season,
+            r.team,
+            r.sp_rating                                             as prior_sp,
+            e.net_epa                                               as prior_net_epa,
+            e.win_pct                                               as prior_win_pct
+        from silver.silver_ratings_sp r
+        join team_eff e on r.team = e.team and r.season = e.season
+        where r.sp_rating is not null and e.net_epa is not null
+    """,
+    # One row per settled regular-season game between two teams that carry priors for that
+    # season (the same FBS-vs-FBS scope as the frozen forecast). Margins are the evidence the
+    # in-season ratings learn from; kickoff timestamps order the leakage-safe "as-of" updates.
+    "inseason_games": """
+        with team_eff as (
+            select team, season,
+                   avg(net_epa_per_play) as net_epa
+            from gold.mart_team_efficiency
+            group by team, season
+        ),
+        priors as (
+            select r.season + 1 as season, r.team
+            from silver.silver_ratings_sp r
+            join team_eff e on r.team = e.team and r.season = e.season
+            where r.sp_rating is not null
+        )
+        select
+            g.game_id,
+            g.season,
+            g.week,
+            strftime(g.start_date, '%Y-%m-%dT%H:%M:%S')             as start_date,
+            cast(g.is_neutral_site as integer)                      as neutral_site,
+            g.home_team,
+            g.away_team,
+            g.home_points,
+            g.away_points,
+            g.home_margin,
+            cast(g.home_won as integer)                             as home_won
+        from gold.dim_game g
+        join priors h on g.home_team = h.team and g.season = h.season
+        join priors a on g.away_team = a.team and g.season = a.season
+        where g.season_type = 'regular'
+          and g.home_won is not null
+          and g.home_points is not null and g.away_points is not null
+        order by g.season, g.start_date, g.game_id
+    """,
 }
 
 

@@ -65,6 +65,15 @@
   .metric .base.beat{color:var(--good);}
   .metric .base.lost{color:var(--bad);}
   .wkbars{margin-top:16px;}
+  .snaps{margin-top:16px;}
+  .snaps summary{cursor:pointer;font:600 10px 'Space Grotesk';letter-spacing:.1em;text-transform:uppercase;color:var(--sub);}
+  .snaps table{width:100%;border-collapse:collapse;margin-top:8px;font:500 11px 'JetBrains Mono';}
+  .snaps th{text-align:left;font:600 9px 'Space Grotesk';letter-spacing:.1em;text-transform:uppercase;color:var(--sub);padding:4px 6px;border-bottom:1px solid var(--border);}
+  .snaps td{padding:4px 6px;border-bottom:1px solid var(--border);color:var(--sub);}
+  .snaps td.num,.snaps th.num{text-align:right;}
+  .snaps td.now{color:var(--text);}
+  .method{font:500 12px 'Space Grotesk';color:var(--sub);margin-top:12px;line-height:1.5;}
+  .method b{color:var(--text);}
   .wkbars .lbl{font:600 10px 'Space Grotesk';letter-spacing:.1em;text-transform:uppercase;color:var(--sub);margin-bottom:8px;}
   .wkrow{display:flex;align-items:center;gap:9px;margin:5px 0;}
   .wkrow .wk{font:600 11px 'JetBrains Mono';color:var(--sub);width:34px;}
@@ -97,7 +106,7 @@
   .gamecard .match{flex:1;min-width:230px;font:600 13.5px 'Space Grotesk';}
   .gamecard .match .fav{color:var(--a);}
   .gamecard .score{font:700 13px 'JetBrains Mono';width:64px;text-align:center;}
-  .gamecard .prob{font:600 11.5px 'JetBrains Mono';color:var(--sub);width:150px;}
+  .gamecard .prob{font:600 11.5px 'JetBrains Mono';color:var(--sub);min-width:150px;}
   .empty{text-align:center;color:var(--sub);font:500 14px 'Space Grotesk';padding:36px;}
   .finalband{margin-top:14px;border-radius:16px;border:1px solid var(--a);background:color-mix(in srgb,var(--a) 10%,var(--panel));
     padding:16px 20px;font:500 14px/1.6 'Space Grotesk';}
@@ -150,6 +159,7 @@
       <input id="tq" type="text" placeholder="Find a team…" autocomplete="off"></div>
     <select id="tsort">
       <option value="rank">Sort: original projection</option>
+      <option value="rating">Sort: current rating</option>
       <option value="aw">Sort: actual wins</option>
       <option value="diff">Sort: beat / missed projection</option>
       <option value="name">Sort: team A–Z</option>
@@ -191,6 +201,8 @@ const teamsById = {};
   s.push(`<span class="pill">Season <b>${DATA.season}</b></span>`);
   s.push(`<span class="pill"><b>${DATA.settled}</b> of <b>${DATA.total}</b> predicted games settled</span>`);
   s.push(`<span class="pill">${DATA.versions.length} frozen version${DATA.versions.length>1?'s':''}</span>`);
+  const nSnap = DATA.versions.reduce((n,v)=>n+((v.snapshots||[]).length),0);
+  if(nSnap) s.push(`<span class="pill"><b>${nSnap}</b> in-season snapshot${nSnap>1?'s':''}</span>`);
   if(DATA.season_complete) s.push(`<span class="pill final">SEASON COMPLETE — FINAL VERDICT BELOW</span>`);
   if(!DATA.results_available) s.push(`<span class="pill">results feed unavailable at build time</span>`);
   s.push(`<span class="pill">updated ${DATA.built_at.slice(0,10)}</span>`);
@@ -203,10 +215,17 @@ const teamsById = {};
   el.innerHTML = DATA.versions.map((v,i)=>{
     const isOrig = v.version === DATA.original;
     const o = v.overall || {};
-    const when = `predicted ${v.generated_at.slice(0,10)} · ${v.n_games} games forecast`;
+    const snaps = v.snapshots || [];
+    const when = v.series
+      ? (snaps.length
+          ? `model sealed ${v.generated_at.slice(0,10)} · re-forecast after every game day · ${snaps.length} snapshot${snaps.length>1?'s':''}, latest ${(v.latest_generated_at||'').slice(0,10)}`
+          : `model sealed ${v.generated_at.slice(0,10)} · first snapshot lands with the next results`)
+      : `predicted ${v.generated_at.slice(0,10)} · ${v.n_games} games forecast`;
     let body;
     if(!o.n){
-      body = `<div class="empty">No settled games in this version's window yet — scores appear as games finish.</div>`;
+      body = v.series
+        ? `<div class="empty">No game has kicked off since a snapshot was sealed yet — the live series scores each game with the latest snapshot that predates its kickoff.</div>`
+        : `<div class="empty">No settled games in this version's window yet — scores appear as games finish.</div>`;
     } else {
       const accBeat = o.acc >= o.home_acc;
       const brBeat = o.brier <= DATA.coinflip_brier;
@@ -221,10 +240,11 @@ const teamsById = {};
       </div>
       ${weekBars(v.weekly)}`;
     }
+    if(v.series) body += snapTable(v) + methodNote(v);
     return `<div class="card vcard">
       <div class="vhead"><span class="vname">${v.label}</span>
-        <span class="vtag ${isOrig?'orig':'upd'}">${isOrig?'Original — frozen':'Updated model'}</span></div>
-      <div class="vwhen">${when}${isOrig?'':' · scored forward-only from its freeze date'}</div>
+        <span class="vtag ${isOrig?'orig':'upd'}">${isOrig?'Original — frozen':(v.series?'Updated model — live':'Updated model')}</span></div>
+      <div class="vwhen">${when}${isOrig?'':' · every snapshot scored forward-only from the moment it was sealed'}</div>
       ${body}</div>`;
   }).join('');
   if(DATA.versions.length === 1){
@@ -234,6 +254,30 @@ const teamsById = {};
       <div class="empty">The original stands alone so far — improvements will be judged on the same terms.</div></div>`;
   }
 })();
+
+function snapTable(v){
+  const snaps = (v.snapshots||[]).slice().reverse();
+  if(!snaps.length) return '';
+  const rows = snaps.map((s,i)=>{
+    const o = s.overall||{};
+    return `<tr><td class="${i===0?'now':''}">${s.generated_at.slice(0,16).replace('T',' ')}${i===0?' (current)':''}</td>
+      <td class="num">${s.results_in}</td><td class="num">${s.n_eligible}</td>
+      <td class="num">${o.n?o.n:'—'}</td><td class="num">${o.n?fmtPct(o.acc):'—'}</td><td class="num">${o.n?o.brier.toFixed(3):'—'}</td></tr>`;
+  }).join('');
+  return `<details class="snaps"><summary>Snapshot ledger — ${snaps.length} sealed re-forecast${snaps.length>1?'s':''}</summary>
+    <table><tr><th>Sealed (UTC)</th><th class="num">Results in</th><th class="num">Games ahead</th>
+      <th class="num">Scored</th><th class="num">Picked</th><th class="num">Brier</th></tr>${rows}</table></details>`;
+}
+
+function methodNote(v){
+  const h = v.hyperparameters||{}, m = v.holdout_metrics||{};
+  if(!h.ridge_k) return '';
+  return `<div class="method"><b>How it updates:</b> each team starts at its preseason strength and moves toward its
+    season-to-date, opponent-adjusted scoring margins; the preseason prior is worth <b>${h.ridge_k} game${h.ridge_k==1?'':'s'}</b> of
+    evidence, and home field is worth <b>${h.home_adv.toFixed(1)} points</b>. Before this season it was tested on
+    ${v.holdout_season||'the previous season'} without peeking: Brier <b>${(m.brier||0).toFixed(3)}</b> vs
+    <b>${(m.brier_priors||0).toFixed(3)}</b> for the preseason-only model on the same ${m.n_test||''} games.</div>`;
+}
 
 function weekBars(weekly){
   if(!weekly || !weekly.length) return '';
@@ -261,10 +305,10 @@ function weekBars(weekly){
     const q = document.getElementById('tq').value.trim().toLowerCase();
     const sort = document.getElementById('tsort').value;
     let rows = DATA.teams.filter(t=>!q || t.team.toLowerCase().includes(q));
-    const key = {rank:t=>t.rank, aw:t=>-t.aw, diff:t=>-(t.aw-t.pw), name:t=>t.team}[sort]
+    const key = {rank:t=>t.rank, rating:t=>('rk' in t?t.rk:999), aw:t=>-t.aw, diff:t=>-(t.aw-t.pw), name:t=>t.team}[sort]
       || (t=>t.rank);
     rows = rows.slice().sort((a,b)=>{const ka=key(a),kb=key(b);return ka<kb?-1:ka>kb?1:0;});
-    const head = `<tr><th>Team</th><th class="num">Original proj. W</th>${hasUpd?'<th class="num">Updated proj. W</th>':''}
+    const head = `<tr><th>Team</th><th class="num">Original proj. W</th>${hasUpd?'<th class="num">Updated proj. W</th><th class="num" title="Current rating in points vs an average FBS team (preseason rating in brackets)">Rating now</th>':''}
       <th class="num">Actual</th><th class="num">Games left</th><th class="num">${done?'Final miss':'vs projection'}</th></tr>`;
     document.getElementById('teamtable').innerHTML = head + rows.map(t=>{
       const pace = t.aw - t.pw * ((t.aw+t.al) / t.g || 0);
@@ -273,7 +317,7 @@ function weekBars(weekly){
       const dtxt = (t.aw+t.al)===0 ? '—' : `${diff>=0?'+':''}${diff.toFixed(1)}`;
       return `<tr><td class="team"><span class="rk">#${t.rank}</span>${t.team}</td>
         <td class="num">${t.pw.toFixed(1)} / ${t.g}</td>
-        ${hasUpd?`<td class="num">${'pwl' in t?t.pwl.toFixed(1):'—'}</td>`:''}
+        ${hasUpd?`<td class="num">${'pwl' in t?t.pwl.toFixed(1):'—'}</td><td class="num">${'rt' in t?`#${t.rk} · ${t.rt>=0?'+':''}${t.rt.toFixed(1)} <span style="color:var(--sub);">(${t.rt0>=0?'+':''}${t.rt0.toFixed(1)})</span>`:'—'}</td>`:''}
         <td class="num">${t.aw}–${t.al}</td><td class="num">${t.left}</td>
         <td class="num ${cls}">${dtxt}</td></tr>`;
     }).join('');
@@ -310,7 +354,7 @@ function weekBars(weekly){
       } else {
         right = `<span class="chip wait">not played</span>`;
       }
-      const upd = ('pl' in g && g.pl !== g.p) ? ` · upd ${fmtPct(favHome?g.pl:1-g.pl)}` : '';
+      const upd = ('pl' in g) ? ` · now ${fmtPct(favHome?g.pl:1-g.pl)}${'pm' in g?` (${g.pm>=0?g.home:g.away} by ${Math.abs(g.pm).toFixed(1)})`:''}` : '';
       return `<div class="gamecard"><span class="dt">${g.date.slice(5)}${g.neutral?' · N':''}</span>
         <span class="match">${g.away} at <span class="${favHome?'fav':''}">${g.home}</span></span>
         <span class="score">${score}</span>

@@ -207,6 +207,17 @@
     its naive baseline by a clear margin.</p>
   <div class="cards" id="priorCards"></div>
 
+  <!-- in-season update -->
+  <div class="sec"><h2>In-Season Update — the Live 2026 Forecast</h2><span class="line"></span><span class="hint">PRIOR + RESULTS, EVERY GAME DAY</span></div>
+  <p class="lead">Once the season starts, a third model <b>updates the preseason forecast from results</b>.
+    Every team begins at its preseason strength and moves toward its season-to-date, opponent-adjusted
+    scoring margins — a Bayesian ridge where the prior is worth a fixed number of games of evidence.
+    It needs no play-by-play, so it re-forecasts the rest of the schedule after every game day; each
+    re-forecast is sealed as a snapshot and graded only on games that had not yet kicked off. Tested
+    on the held-out season before going live, it beats the preseason-only model on the same games.
+    Follow it on the <a href="forecast.html">Forecast Scoreboard</a>.</p>
+  <div class="cards" id="inseasonCards"></div>
+
   <!-- supporting models -->
   <div class="sec"><h2>The Supporting Cast</h2><span class="line"></span><span class="hint">EIGHT MORE MODELS BEHIND THE STATS</span></div>
   <p class="lead">The efficiency and talent numbers you see are themselves outputs of a modeling
@@ -362,6 +373,19 @@ const priorCards=[
 ];
 document.getElementById('priorCards').innerHTML=priorCards.map(c=>
   `<div class="metric"><div class="k">${c.k}</div><div class="v">${c.v}</div><div class="s">${c.s}</div></div>`).join('');
+
+/* ---------- in-season update cards ---------- */
+const I = (DATA.inseason||{}).metrics||{};
+if(I.brier!=null){
+  const inCards=[
+    {k:'Brier',v:num(I.brier,3),s:'vs '+num(I.brier_priors,3)+' preseason-only, same games'},
+    {k:'AUC',v:num(I.auc,3),s:'ranking skill, updated in-season'},
+    {k:'Accuracy',v:pct(I.accuracy,1),s:'vs '+pct(I.accuracy_priors,1)+' preseason-only'},
+    {k:'Prior Weight',v:I.ridge_k!=null?Math.round(I.ridge_k)+' games':'—',s:'evidence the preseason prior is worth'},
+  ];
+  document.getElementById('inseasonCards').innerHTML=inCards.map(c=>
+    `<div class="metric"><div class="k">${c.k}</div><div class="v">${c.v}</div><div class="s">${c.s}</div></div>`).join('');
+}
 
 /* ---------- supporting models ---------- */
 document.getElementById('mseason').textContent=DATA.season;

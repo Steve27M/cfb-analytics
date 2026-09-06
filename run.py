@@ -125,6 +125,7 @@ def models() -> None:
         "analysis/R/game_model_train.R",  # in-season game win-prob model (tidymodels)
         "analysis/R/game_model_score.R",
         "analysis/R/priors_model.R",    # preseason priors model (predicts before season form)
+        "analysis/R/inseason.R",        # in-season update model (priors + season-to-date margins)
     ]
     rscript = _find_rscript()
     for s in scripts:
@@ -138,7 +139,7 @@ def models() -> None:
 def parity() -> None:
     """Run the Python parity fits, then load all results to gold with the R<->Python parity gate."""
     for s in ["stability", "ryoe", "cpoe", "poisson", "archetypes", "shrinkage",
-              "recruiting", "game_model", "priors_model"]:
+              "recruiting", "game_model", "priors_model", "inseason"]:
         script = f"analysis/python/{s}.py"
         if (REPO_ROOT / script).exists():
             _run(["uv", "run", "python", script])
@@ -160,8 +161,19 @@ def forecast(season: int = typer.Argument(2026, help="Future season to forecast.
 
 
 @app.command()
+def inseason(season: int = typer.Argument(2026, help="Live season the model updates."),
+             freeze: str = typer.Option(None, help="Seal the fitted in-season model into "
+                                                   "predictions/<season>/<label>/ (immutable).")) -> None:
+    """In-season update model: seal the fitted model (--freeze LABEL) and/or take a snapshot."""
+    if freeze:
+        _run(["uv", "run", "python", "-m", "cfb_analytics.inseason", "freeze", str(season), freeze])
+    _run(["uv", "run", "python", "-m", "cfb_analytics.inseason", "snapshot", str(season)])
+
+
+@app.command()
 def score() -> None:
-    """Score every frozen forecast version against settled results -> docs/forecast.html."""
+    """Snapshot the in-season model if new results settled, then score every frozen forecast
+    version against settled results -> docs/forecast.html."""
     _run(["uv", "run", "python", "dashboard/build_forecast.py"])
 
 

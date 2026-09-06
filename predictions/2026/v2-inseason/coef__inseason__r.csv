@@ -1,0 +1,6 @@
+model,term,estimate,language,odds_ratio
+inseason_winprob,(Intercept),-0.0735309522036669,r,0.92910738742537
+inseason_winprob,pred_margin,0.0991490499799772,r,1.1042308728832455
+inseason_winprob,ridge_k,2.0,r,
+inseason_winprob,gamma,12.108733233178018,r,
+inseason_winprob,home_adv,3.7552454989003694,r,
