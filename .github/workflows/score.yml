@@ -1,13 +1,15 @@
 # Scoreboard refresh: score every frozen forecast version against settled results and
 # republish docs/forecast.html. One CFBD API call per run (polite UA), daily during the
-# season (Aug-Dec) — ~30 calls/month against the 1,000/month free-tier quota. This is the
+# three times a day in season (Aug-Dec) — ~90 calls/month against the 1,000/month free-tier quota. This is the
 # project's only scheduled collection; the warehouse/model pipeline stays on-demand.
 # Once the last predicted game settles, the page stops changing and commits stop naturally.
 name: score
 
 on:
   schedule:
-    - cron: "20 9 * 8-12 *"   # 09:20 UTC daily Aug-Dec (early morning US — after late games)
+    - cron: "20 3,9,15 * 8-12 *"   # 03:20/09:20/15:20 UTC daily Aug-Dec: late Saturday night US,
+                                   # early morning (after the West-coast finals), and a late-morning
+                                   # catch-up — GitHub often starts scheduled runs 3-5 h late
   workflow_dispatch: {}
 
 concurrency:

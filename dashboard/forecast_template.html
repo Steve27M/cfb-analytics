@@ -159,6 +159,8 @@
 
   <div class="sec"><h2>Game by game</h2><span class="line"></span></div>
   <div class="toolbar">
+    <div class="search"><span style="color:var(--sub);font-size:15px;">🔎</span>
+      <input id="gq" type="text" placeholder="Follow a team’s schedule…" autocomplete="off"></div>
     <select id="gweek"></select>
     <select id="gfilter">
       <option value="all">All games</option>
@@ -291,7 +293,9 @@ function weekBars(weekly){
     weeks.map(w=>`<option value="${w}" ${w===defWeek?'selected':''}>Week ${w}</option>`).join('');
   function render(){
     const wk = wsel.value, f = document.getElementById('gfilter').value;
+    const q = document.getElementById('gq').value.trim().toLowerCase();
     let gs = DATA.games.filter(g=> (wk==='all' || g.wk===+wk));
+    if(q) gs = gs.filter(g=> g.home.toLowerCase().includes(q) || g.away.toLowerCase().includes(q));
     if(f==='settled') gs = gs.filter(g=>'hw' in g);
     if(f==='upcoming') gs = gs.filter(g=>!('hw' in g));
     document.getElementById('gcount').textContent = `${gs.length} games`;
@@ -315,6 +319,9 @@ function weekBars(weekly){
   }
   wsel.addEventListener('change', render);
   document.getElementById('gfilter').addEventListener('change', render);
+  // typing a team switches to the full season so its whole schedule shows; clearing it snaps back
+  document.getElementById('gq').addEventListener('input', e=>{
+    wsel.value = e.target.value.trim() ? 'all' : String(defWeek); render(); });
   render();
 })();
 </script>

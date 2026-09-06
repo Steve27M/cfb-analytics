@@ -84,7 +84,7 @@ honestly less certain, and the dashboard quantifies the gap).
 - **Verdict: GO-WITH-CONDITIONS** — non-commercial portfolio use, attributed, bounded
   collection. The warehouse/model pipeline is on-demand (no perpetual poller); the one
   scheduled job is the in-season scoreboard refresh (`.github/workflows/score.yml`): **one**
-  API call per day, Aug–Dec (~30 calls/month against the 1,000/month free-tier quota —
+  API call per run, three runs a day, Aug–Dec (~90 calls/month against the 1,000/month free-tier quota —
   CFBD's terms explicitly encourage scheduled polling). Terms re-verified 2026-08-31.
 
 ## Quickstart
@@ -198,6 +198,6 @@ range — R, Python, and SQL each doing what they're best at, cross-checked agai
 Done: ingestion (API + ethical scrape) → medallion → Kimball star + SCD2 → book models **M1–M8**
 (R + Python) → in-season + preseason win-probability models → **live 2026-season forecast** (the
 priors model applied to CFBD's 2026 schedule) → Quarto dashboard live on GitHub Pages → **frozen
-prediction registry + self-updating 2026 scoreboard** (daily in-season GitHub Actions refresh).
+prediction registry + self-updating 2026 scoreboard** (in-season GitHub Actions refresh three times a day).
 Deferred but pre-structured: full **CI** (lint + `dbt build`) and a **BigQuery** push of the gold
 tables. See [`PROJECT_PLAN.md`](PROJECT_PLAN.md) for the full plan.
