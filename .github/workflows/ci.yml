@@ -1,0 +1,38 @@
+# Code checks on every push / PR: lint, types, unit tests (offline — no CFBD key, no warehouse),
+# a keyless scoreboard build from the registry alone, and the registry integrity gate.
+# The scheduled refresh (score.yml) runs these tests again before it trusts the gates.
+name: ci
+
+on:
+  push:
+    branches: [main]
+    paths: ["src/**", "dashboard/**", "tests/**", "predictions/**", "pyproject.toml", "uv.lock",
+            ".github/workflows/ci.yml"]
+  pull_request:
+    paths: ["src/**", "dashboard/**", "tests/**", "predictions/**", "pyproject.toml", "uv.lock",
+            ".github/workflows/ci.yml"]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: ruff
+        run: uv run ruff check src dashboard tests
+      - name: mypy
+        run: uv run python -m mypy src
+      - name: pytest
+        run: uv run python -m pytest tests -q
+      - name: registry integrity
+        run: uv run python -c "from cfb_analytics import registry; import sys; sys.exit(0 if registry.verify(2026)['ok'] else 1)"
+      - name: keyless scoreboard build (registry only, no network)
+        run: |
+          uv run python dashboard/build_forecast.py
+          git diff --stat -- predictions/ && test -z "$(git status --porcelain -- predictions/)"

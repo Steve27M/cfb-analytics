@@ -1,18 +1,28 @@
 """Build the 2026 forecast scoreboard page (docs/forecast.html).
 
-Reads every frozen version in predictions/<season>/ (the immutable registry), pulls settled
-results from CFBD's /games endpoint (one call, polite UA), and scores each version against the
-games that were still in the future when that version was generated — the before-kickoff rule
-that keeps mid-season model improvements honest. Emits data/gold/forecast_page.json and injects
-it into docs/forecast.html via dashboard/forecast_template.html.
+Reads every frozen version in predictions/<season>/ (the immutable registry), pulls CFBD's
+current listing for the season (one call, polite UA), reconciles it against the frozen schedule
+and VALIDATES it, and scores each version against the games that were still in the future when
+that version was generated — the before-kickoff rule that keeps mid-season model improvements
+honest. Emits data/gold/forecast_page.json and injects it into docs/forecast.html via
+dashboard/forecast_template.html.
+
+Gates, in order (all reported on the page under "Data integrity"):
+  1. registry.verify      every sealed file matches its manifest hash; snapshot chain is sound
+  2. results.reconcile    frozen orientation, scores aligned by TEAM, live kickoff, re-keyed ids
+  3. results.validate     hard invariants (winner-by-name, team records, settled-after-kickoff,
+                          no ties, sane points, unique ids); soft notes (drift)
+A hard failure QUARANTINES the results: the page is still built (frozen predictions, banner,
+no scoring from the bad pull), no snapshot is sealed, and the process exits 2 so the scheduled
+workflow fails loudly after committing the flagged page.
 
 Two kinds of registry version:
   * a flat version (v1-preseason): one forecast, one generated_at, scored forward from that.
   * a series (v2-inseason): a sealed model plus timestamped snapshots/, each re-rated from the
     results settled at that moment. The refresh first asks the model for a new snapshot (written
-    only when new results have settled), then scores every snapshot forward-only AND the "live"
-    series — for each game, the latest snapshot that predates its kickoff, which is what a reader
-    following the season actually saw.
+    only when new, validated results have settled), then scores every snapshot forward-only AND
+    the "live" series — for each game, the latest snapshot that predates its kickoff, which is
+    what a reader following the season actually saw.
 
 Runs fine without a CFBD key (or offline): the page then shows the frozen predictions with the
 accuracy sections waiting for results. The registry is the only required input, so a clean
@@ -22,47 +32,23 @@ from __future__ import annotations
 
 import json
 import math
-from datetime import datetime, timezone
+import sys
+from datetime import UTC, datetime
 
 import pandas as pd
 
-from cfb_analytics import inseason
+from cfb_analytics import inseason, registry, results
 from cfb_analytics.config import REPO_ROOT
 
 SEASON = 2026
-REGISTRY = REPO_ROOT / "predictions" / str(SEASON)
 TEMPLATE = REPO_ROOT / "dashboard" / "forecast_template.html"
 OUT_HTML = REPO_ROOT / "docs" / "forecast.html"
 OUT_JSON = REPO_ROOT / "data" / "gold" / "forecast_page.json"
+OUT_CHECKS = REPO_ROOT / "data" / "gold" / "forecast_checks.json"
 
 
 def _iso(ts: str) -> datetime:
     return datetime.fromisoformat(ts.replace("Z", "+00:00"))
-
-
-def _read_version(d) -> dict:
-    manifest = json.loads((d / "manifest.json").read_text(encoding="utf-8"))
-    return {"dir": d.name, "manifest": manifest,
-            "games": pd.read_csv(d / f"forecast_{SEASON}.csv"),
-            "teams": pd.read_csv(d / f"forecast_{SEASON}_teams.csv")}
-
-
-def _load_versions() -> list[dict]:
-    versions = []
-    for d in sorted(p for p in REGISTRY.iterdir() if p.is_dir()):
-        manifest = json.loads((d / "manifest.json").read_text(encoding="utf-8"))
-        if manifest.get("kind") == "series":
-            snaps = [_read_version(s) for s in sorted((d / "snapshots").iterdir())
-                     if s.is_dir()] if (d / "snapshots").exists() else []
-            snaps.sort(key=lambda v: v["manifest"]["generated_at"])
-            versions.append({"dir": d.name, "manifest": manifest, "series": True,
-                             "snapshots": snaps})
-        else:
-            versions.append({**_read_version(d), "series": False})
-    if not versions:
-        raise SystemExit(f"no frozen versions under {REGISTRY}")
-    versions.sort(key=lambda v: (v["series"], v["manifest"]["generated_at"]))
-    return versions
 
 
 def _score(df: pd.DataFrame) -> dict:
@@ -77,19 +63,24 @@ def _score(df: pd.DataFrame) -> dict:
         "n": int(n),
         "acc": round(float((picked_home == df.home_won).mean()), 4),
         "brier": round(float(((df.home_win_prob - y) ** 2).mean()), 4),
-        "logloss": round(float(-(y * p.map(math.log) + (1 - y) * (1 - p).map(math.log)).mean()), 4),
+        "logloss": round(float(-(y * p.map(math.log)
+                                 + (1 - y) * (1 - p).map(math.log)).mean()), 4),
         "home_acc": round(float(y.mean()), 4),  # baseline: pick the home team every game
     }
 
 
 def _weekly(settled: pd.DataFrame) -> list[dict]:
-    return [dict(week=int(w), **_score(g)) for w, g in settled.groupby("week")] if len(settled) else []
+    if not len(settled):
+        return []
+    return [dict(week=int(w), **_score(g)) for w, g in settled.groupby("week")]
 
 
-def _forward_only(pred: pd.DataFrame, games: pd.DataFrame, generated_at: str) -> tuple[pd.DataFrame, int]:
+def _forward_only(pred: pd.DataFrame, games: pd.DataFrame,
+                  generated_at: str) -> tuple[pd.DataFrame, int]:
     """Games this forecast may be scored on (kickoff after generated_at) and how many settled."""
     gen = _iso(generated_at)
-    vg = pred.merge(games[["game_id", "start_ts", "settled", "home_won"]], on="game_id", how="inner")
+    vg = pred.merge(games[["game_id", "start_ts", "settled", "home_won"]], on="game_id",
+                    how="inner")
     eligible = vg[vg.start_ts > gen]
     return eligible[eligible.settled.fillna(False)].copy(), int(len(eligible))
 
@@ -109,19 +100,41 @@ def _live_series(snaps: list[dict], games: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(list(rows.values()))
 
 
-def build() -> dict:
-    results = inseason.settled_games(SEASON)
-    # let every sealed in-season model add a snapshot if new results have settled (no-op otherwise)
-    for d in sorted(p for p in REGISTRY.iterdir() if p.is_dir()):
-        manifest = json.loads((d / "manifest.json").read_text(encoding="utf-8"))
-        if manifest.get("kind") == "series" and len(results):
-            inseason.snapshot(SEASON, d.name, results=results)
+def _drift_summary(drift: dict) -> dict:
+    """What the page shows: counts for everything, rows for the identity-level changes."""
+    lists = {k: v for k, v in drift.items() if isinstance(v, list)}
+    return {
+        "counts": {k: len(v) for k, v in lists.items()},
+        "rows": {k: lists[k] for k in ("mirrored", "rekeyed", "missing", "changed",
+                                       "neutral_changed", "week_moved") if lists.get(k)},
+        "n_listed": drift.get("n_listed", 0), "n_frozen": drift.get("n_frozen", 0),
+    }
 
-    versions = _load_versions()
+
+def build() -> dict:
+    # gate 1: the registry itself
+    integrity = registry.verify(SEASON)
+
+    # gate 2 + 3: live listing, reconciled to the frozen schedule and validated
+    raw = results.fetch_games(SEASON)
+    sched = registry.load_schedule(SEASON)
+    games, drift = results.reconcile(sched, raw)
+    report = results.validate(games, raw)
+    quarantined = bool(len(raw)) and not report["ok"]
+    if quarantined:
+        # keep the frozen predictions on the page, but score NOTHING from this pull
+        games["settled"] = False
+        games[["home_points", "away_points"]] = None
+
+    # let every sealed in-season model add a snapshot if new, validated results have settled
+    if len(raw) and integrity["ok"] and not quarantined:
+        for d in sorted(p for p in registry.registry_dir(SEASON).iterdir() if p.is_dir()):
+            if registry.read_manifest(d).get("kind") == "series":
+                inseason.snapshot(SEASON, d.name, results=raw)
+
+    versions = registry.load_versions(SEASON)
     original = versions[0]
-    # one canonical game frame: the frozen 740, results aligned by team into the frozen
-    # orientation, kickoff = CFBD's current start time (the before-kickoff rule uses it)
-    games = inseason.align_results(original["games"].copy(), results)
+    games = games.merge(original["games"][["game_id", "home_win_prob"]], on="game_id")
     games["start_ts"] = games.kickoff.map(_iso)
     games.loc[games.settled, "home_won"] = (
         games.loc[games.settled, "home_points"] > games.loc[games.settled, "away_points"])
@@ -170,9 +183,14 @@ def build() -> dict:
     wins: dict[str, int] = {}
     losses: dict[str, int] = {}
     for _, g in settled_g.iterrows():
-        w, l = ((g.home_team, g.away_team) if g.home_won else (g.away_team, g.home_team))
+        w, lo = ((g.home_team, g.away_team) if g.home_won else (g.away_team, g.home_team))
         wins[w] = wins.get(w, 0) + 1
-        losses[l] = losses.get(l, 0) + 1
+        losses[lo] = losses.get(lo, 0) + 1
+    dropped = games[games.status == "missing"]
+    dropped_by_team: dict[str, int] = {}
+    for _, g in dropped.iterrows():
+        for t in (g.home_team, g.away_team):
+            dropped_by_team[t] = dropped_by_team.get(t, 0) + 1
     teams = []
     for _, t in original["teams"].iterrows():
         row = {
@@ -180,7 +198,7 @@ def build() -> dict:
             "pw": round(float(t.projected_wins), 1), "rank": int(t.projected_rank),
             "aw": wins.get(t.team, 0), "al": losses.get(t.team, 0),
         }
-        row["left"] = row["g"] - row["aw"] - row["al"]
+        row["left"] = row["g"] - row["aw"] - row["al"] - dropped_by_team.get(t.team, 0)
         if latest_teams is not None and t.team in latest_teams.index:
             lt = latest_teams.loc[t.team]
             row["pwl"] = round(float(lt.projected_wins), 1)
@@ -198,6 +216,8 @@ def build() -> dict:
              "neutral": bool(g.neutral_site), "p": round(float(g.home_win_prob), 3)}
         if bool(g.flipped) and not bool(g.neutral_site):
             r["host"] = g.away_team      # CFBD moved the game to the frozen away team's field
+        if g.status == "missing":
+            r["gone"] = True             # CFBD no longer lists it (cancelled / not yet re-keyed)
         if live_by_id is not None and g.game_id in live_by_id.index:
             lv = live_by_id.loc[g.game_id]
             r["pl"] = round(float(lv.home_win_prob), 3)
@@ -208,28 +228,37 @@ def build() -> dict:
         game_rows.append(r)
 
     n_settled = int(games.settled.fillna(False).sum())
+    n_dropped = int(len(dropped))
     series = [v for v in scored_versions if v["series"]]
+    checks = {"registry": integrity, "results": report, "drift": _drift_summary(drift),
+              "quarantined": quarantined, "results_available": bool(len(raw))}
     payload = {
         "season": SEASON,
-        "built_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "results_available": bool(len(results)),
+        "built_at": datetime.now(UTC).isoformat(timespec="seconds"),
+        "results_available": bool(len(raw)),
+        "quarantined": quarantined,
         "original": original["dir"],
         "latest": series[-1]["version"] if series else original["dir"],
         "versions": scored_versions,
         "teams": teams,
         "games": game_rows,
         "settled": n_settled,
+        "dropped": n_dropped,
         "total": int(len(games)),
-        "season_complete": n_settled == len(games),
+        "season_complete": n_settled + n_dropped == len(games) and n_settled > 0,
         "coinflip_brier": 0.25,
+        "checks": checks,
     }
 
     OUT_JSON.parent.mkdir(parents=True, exist_ok=True)
     OUT_JSON.write_text(json.dumps(payload), encoding="utf-8")
+    OUT_CHECKS.write_text(json.dumps(checks, indent=2), encoding="utf-8")
     ov = scored_versions[-1]["overall"]
     n_snaps = sum(len(v.get("snapshots", [])) for v in series)
     print(f"  {len(versions)} version(s), {n_snaps} snapshot(s) · {n_settled}/{len(games)} games "
-          f"settled" + (f" · latest acc {ov['acc']:.1%}, Brier {ov['brier']}" if ov.get("n") else ""))
+          f"settled"
+          + (f" · latest acc {ov['acc']:.1%}, Brier {ov['brier']}" if ov.get("n") else "")
+          + (" · RESULTS QUARANTINED" if quarantined else ""))
 
     html = TEMPLATE.read_text(encoding="utf-8").replace("__FORECAST_DATA__", json.dumps(payload))
     OUT_HTML.write_text(html, encoding="utf-8")
@@ -238,4 +267,7 @@ def build() -> dict:
 
 
 if __name__ == "__main__":
-    build()
+    out = build()
+    if out["quarantined"] or not out["checks"]["registry"]["ok"]:
+        print("  exiting 2: data integrity gate failed (page built and flagged)")
+        sys.exit(2)

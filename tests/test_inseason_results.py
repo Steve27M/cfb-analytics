@@ -71,7 +71,7 @@ def test_unmatched_teams_are_left_unsettled(capsys):
     g = out.loc[5]
     assert not g.settled and not g.flipped
     assert pd.isna(g.home_points) and pd.isna(g.away_points)
-    assert "no longer match" in capsys.readouterr().out
+    assert "changed" in capsys.readouterr().out
 
 
 def test_no_results_means_nothing_settled():

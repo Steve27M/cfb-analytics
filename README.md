@@ -146,6 +146,17 @@ snapshot forward-only plus the *live series* (for each game, the latest snapshot
 its kickoff — what a reader following the season actually saw). Built in R and Python like every
 other model here; the ridge weight, margin scale and home-field estimate sit in the parity gate.
 
+**Nothing is scored or sealed unchecked.** The frozen schedule is only the registry's key space;
+hosts, kickoffs and even game ids change after a freeze (CFBD re-designated the home team of the
+week-1 Notre Dame–Wisconsin game at Lambeau Field, which briefly scored that game backwards).
+Every refresh now verifies the registry's manifest hashes, reconciles CFBD's live listing against
+the frozen games *by team* (orientation, re-keyed ids, current kickoff), validates the results
+against hard invariants (winner-by-name, independently derived team records, no result before
+kickoff, no ties, sane scores) and checks each snapshot before writing it. A failed check
+**quarantines** the pull: the page shows a banner and the failing check, nothing is scored or
+sealed, and the workflow fails so it is noticed. See the gate table in
+[`predictions/README.md`](predictions/README.md#validation-gates--what-every-refresh-checks-before-it-scores-or-seals-anything).
+
 ## Case study — engineering & modeling decisions
 
 The point of this repo is craft, not just a result. The decisions that shaped it:

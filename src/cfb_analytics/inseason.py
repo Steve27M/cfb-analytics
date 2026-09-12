@@ -18,6 +18,11 @@ The scoreboard (dashboard/build_forecast.py) scores every snapshot forward-only 
 generated_at, and composes the "live" series: for each game, the latest snapshot that predates
 its kickoff. That is exactly what a reader following the season would have seen.
 
+Results never reach the model raw: cfb_analytics.results reconciles CFBD's live listing against
+the frozen schedule (orientation by team, live kickoff, re-keyed ids) and validates it; a hard
+failure quarantines the results and snapshot() refuses to seal. The sealed snapshot is checked
+again before it is written (records add up, projections bounded by the record, ratings finite).
+
     uv run python -m cfb_analytics.inseason freeze 2026 v2-inseason
     uv run python -m cfb_analytics.inseason snapshot 2026
 """
@@ -25,26 +30,24 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import requests
 
+from . import registry
 from .config import REPO_ROOT
+from .results import fetch_games, reconcile, validate
 
-CFBD_GAMES_URL = "https://api.collegefootballdata.com/games"
-CFBD_UA = "cfb-analytics/1.0 (portfolio; +https://github.com/Steve27M/cfb-analytics)"
 GOLD_DIR = REPO_ROOT / "data" / "gold"
 RESULTS_DIR = REPO_ROOT / "data" / "results"
-PREDICTIONS_DIR = REPO_ROOT / "predictions"
+PREDICTIONS_DIR = registry.PREDICTIONS_DIR
 MODEL = "inseason_winprob"
 DEFAULT_LABEL = "v2-inseason"
-SCHEDULE_VERSION = "v1-preseason"   # the frozen game list + kickoff times every snapshot reuses
+SCHEDULE_VERSION = registry.SCHEDULE_VERSION
 PRIOR_TERMS = {"prior_sp_diff": "prior_sp", "prior_net_epa_diff": "prior_net_epa",
                "prior_win_pct_diff": "prior_win_pct"}
 
@@ -87,84 +90,13 @@ def ridge_ratings(played: pd.DataFrame, strength: pd.Series, k: float, gamma: fl
 
 # --------------------------------------------------------------------------- CFBD results
 def settled_games(season: int) -> pd.DataFrame:
-    """Settled regular-season games from CFBD (best-effort: empty frame without a key/offline).
-    One polite call; this is the only network access the scoreboard refresh makes."""
-    # strip a UTF-8 BOM: a BOM-prefixed key (Windows-written .env pasted into a CI secret)
-    # is invisible in every UI but breaks latin-1 header encoding
-    key = os.getenv("CFBD_API_KEY", "").strip().lstrip("\ufeff")
-    cols = ["game_id", "home_team", "away_team", "start_date", "home_points", "away_points",
-            "completed"]
-    if not key:
-        print("  CFBD_API_KEY not set — continuing without results")
-        return pd.DataFrame(columns=cols)
-    try:
-        resp = requests.get(CFBD_GAMES_URL, params={"year": str(season), "seasonType": "regular"},
-                            headers={"Authorization": f"Bearer {key}", "User-Agent": CFBD_UA},
-                            timeout=60)
-        resp.raise_for_status()
-    except Exception as e:  # noqa: BLE001 — the page must still build offline
-        print(f"  results pull failed ({e}) — continuing without results")
-        return pd.DataFrame(columns=cols)
-    # carry CFBD's CURRENT home/away designation and kickoff: both can change after the
-    # schedule was frozen, and align_results() reconciles them against the frozen orientation
-    return pd.DataFrame([{
-        "game_id": g["id"], "home_team": g.get("homeTeam"), "away_team": g.get("awayTeam"),
-        "start_date": g.get("startDate"),
-        "home_points": g.get("homePoints"), "away_points": g.get("awayPoints"),
-        "completed": bool(g.get("completed")),
-    } for g in resp.json()], columns=cols)
+    """CFBD's current listing for the season (see results.fetch_games)."""
+    return fetch_games(season)
 
 
 def align_results(sched: pd.DataFrame, results: pd.DataFrame) -> pd.DataFrame:
-    """Attach settled results to the frozen schedule, in the schedule's own home/away orientation.
-
-    Games are matched by id, but CFBD can re-orient a game after the schedule was frozen — the
-    2026 Notre Dame–Wisconsin game at Lambeau Field was frozen as Wisconsin (home) vs Notre Dame
-    and settled as Notre Dame (home) 41, Wisconsin 13. Taking homePoints as the frozen home
-    team's score would flip that result. So points are aligned by TEAM: swapped when CFBD's
-    orientation mirrors the frozen one, and left unsettled (with a warning) when the teams no
-    longer match at all.
-
-    Adds per game: home_points/away_points (frozen orientation), completed, settled, flipped,
-    home_ind (+1 the frozen home team hosts, -1 the frozen away team hosts, 0 neutral site) and
-    kickoff — CFBD's current start time, falling back to the frozen one — for the before-kickoff
-    rule, so a game whose kickoff moved is never scored on a forecast made after it was played.
-    """
-    out = sched.copy()
-    if len(results):
-        r = results.rename(columns={"home_team": "cfbd_home", "away_team": "cfbd_away",
-                                    "start_date": "cfbd_start"})
-        out = out.merge(r, on="game_id", how="left")
-    else:
-        for c in ("cfbd_home", "cfbd_away", "cfbd_start", "home_points", "away_points",
-                  "completed"):
-            out[c] = None
-    same = (out.cfbd_home == out.home_team) & (out.cfbd_away == out.away_team)
-    flipped = (out.cfbd_home == out.away_team) & (out.cfbd_away == out.home_team)
-    unmatched = out.cfbd_home.notna() & ~same & ~flipped
-    if unmatched.any():
-        bad = out[unmatched]
-        print(f"  WARNING: {len(bad)} game(s) whose teams no longer match the frozen schedule — "
-              "left unsettled: " + "; ".join(
-                  f"{int(g.game_id)} frozen {g.home_team}/{g.away_team} vs CFBD "
-                  f"{g.cfbd_home}/{g.cfbd_away}" for g in bad.itertuples()))
-        out.loc[unmatched, ["home_points", "away_points"]] = None
-        out.loc[unmatched, "completed"] = False
-    if flipped.any():
-        hp, ap = out.home_points.copy(), out.away_points.copy()
-        out.loc[flipped, "home_points"] = ap[flipped]
-        out.loc[flipped, "away_points"] = hp[flipped]
-        print(f"  {int(flipped.sum())} game(s) re-oriented by CFBD since the freeze — results "
-              "aligned by team: " + "; ".join(
-                  f"{int(g.game_id)} {g.away_team} at {g.home_team}"
-                  + (" (N)" if g.neutral_site else "") for g in out[flipped].itertuples()))
-    out["flipped"] = flipped.to_numpy()
-    out["settled"] = (out.completed.fillna(False).astype(bool)
-                      & out.home_points.notna() & out.away_points.notna())
-    out["home_ind"] = np.where(out.neutral_site.astype(bool), 0.0,
-                               np.where(out.flipped, -1.0, 1.0))
-    out["kickoff"] = out.cfbd_start.where(out.cfbd_start.notna(), out.start_date)
-    return out.drop(columns=["cfbd_home", "cfbd_away", "cfbd_start"])
+    """Results in the frozen schedule's orientation (results.reconcile without the drift report)."""
+    return reconcile(sched, results)[0]
 
 
 # --------------------------------------------------------------------------- helpers
@@ -173,7 +105,7 @@ def _sha256(path: Path) -> str:
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return datetime.now(UTC).isoformat(timespec="seconds")
 
 
 def _git_sha() -> str | None:
@@ -182,6 +114,13 @@ def _git_sha() -> str | None:
                               text=True, check=True).stdout.strip()
     except (subprocess.CalledProcessError, FileNotFoundError):
         return None
+
+
+def _rel(p: Path) -> str:
+    try:
+        return str(p.relative_to(REPO_ROOT))
+    except ValueError:            # a registry outside the repo (tests)
+        return str(p)
 
 
 def _model_dir(season: int, label: str) -> Path:
@@ -199,9 +138,7 @@ def load_model(season: int, label: str = DEFAULT_LABEL) -> dict:
 
 def load_schedule(season: int) -> pd.DataFrame:
     """The frozen game list every snapshot predicts: the original preseason version's games."""
-    path = PREDICTIONS_DIR / str(season) / SCHEDULE_VERSION / f"forecast_{season}.csv"
-    sched = pd.read_csv(path)
-    return sched[["game_id", "week", "start_date", "neutral_site", "home_team", "away_team"]]
+    return registry.load_schedule(season)
 
 
 def results_hash(settled: pd.DataFrame) -> str:
@@ -246,11 +183,13 @@ def freeze_model(season: int, label: str = DEFAULT_LABEL) -> Path:
     ts.to_csv(dst / "team_prior_strength.csv", index=False)
 
     files = {
-        "coef__inseason__r.csv": {"sha256": _sha256(dst / "coef__inseason__r.csv"), "rows": len(coef),
-                                  "grain": "fitted terms: (Intercept), pred_margin, ridge_k, gamma, home_adv"},
-        "team_prior_strength.csv": {"sha256": _sha256(dst / "team_prior_strength.csv"), "rows": len(ts),
-                                    "grain": "one row per team: preseason strength (logit, centered), "
-                                             "prior_rating (points = gamma x strength), prior_rank"},
+        "coef__inseason__r.csv": {
+            "sha256": _sha256(dst / "coef__inseason__r.csv"), "rows": len(coef),
+            "grain": "fitted terms: (Intercept), pred_margin, ridge_k, gamma, home_adv"},
+        "team_prior_strength.csv": {
+            "sha256": _sha256(dst / "team_prior_strength.csv"), "rows": len(ts),
+            "grain": "one row per team: preseason strength (logit, centered), "
+                     "prior_rating (points = gamma x strength), prior_rank"},
     }
     manifest = {
         "version": label,
@@ -261,7 +200,7 @@ def freeze_model(season: int, label: str = DEFAULT_LABEL) -> Path:
         "model": MODEL,
         "model_language": "r (python parity-gated, rtol 1e-4)",
         "generated_at": _now(),
-        "frozen_at": datetime.now(timezone.utc).date().isoformat(),
+        "frozen_at": datetime.now(UTC).date().isoformat(),
         "source_commit": _git_sha(),
         "method": ("Bayesian ridge on scoring margins: every team starts at its preseason strength "
                    "(the priors model's linear predictor, converted to points by gamma) and moves "
@@ -275,7 +214,8 @@ def freeze_model(season: int, label: str = DEFAULT_LABEL) -> Path:
                              "auc", "log_loss", "brier_from_game4", "brier_priors_from_game4",
                              "n_test") if k in m},
         "hyperparameters": {k: float(b[k]) for k in ("ridge_k", "gamma", "home_adv")},
-        "coefficients": {"(Intercept)": float(b["(Intercept)"]), "pred_margin": float(b["pred_margin"])},
+        "coefficients": {"(Intercept)": float(b["(Intercept)"]),
+                         "pred_margin": float(b["pred_margin"])},
         "priors_season": season - 1,
         "schedule_from": SCHEDULE_VERSION,
         "scope": ("the frozen preseason game list (FBS-vs-FBS regular season); only games between "
@@ -289,10 +229,42 @@ def freeze_model(season: int, label: str = DEFAULT_LABEL) -> Path:
         "files": files,
     }
     (dst / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-    print(f"  frozen model -> {dst.relative_to(REPO_ROOT)} (k={b['ridge_k']:g}, gamma="
+    print(f"  frozen model -> {_rel(dst)} (k={b['ridge_k']:g}, gamma="
           f"{b['gamma']:.2f}, home_adv={b['home_adv']:.2f}; holdout Brier {m['brier']:.4f} vs "
           f"priors-only {m['brier_priors']:.4f})")
     return dst
+
+
+# --------------------------------------------------------------------------- snapshot guard
+def check_snapshot(sched: pd.DataFrame, teams: pd.DataFrame, played: pd.DataFrame) -> None:
+    """Invariants a snapshot must satisfy before it is sealed; raises SystemExit otherwise.
+    These catch a wrong model input or a code regression, not a modelling choice."""
+    problems: list[str] = []
+    if not np.isfinite(teams.rating.to_numpy(float)).all():
+        problems.append("non-finite rating")
+    if not np.isfinite(sched.home_win_prob.to_numpy(float)).all() or not (
+            (sched.home_win_prob > 0) & (sched.home_win_prob < 1)).all():
+        problems.append("home_win_prob outside (0, 1)")
+    if (teams.wins + teams.losses + teams.remaining != teams.games).any():
+        problems.append("wins + losses + remaining != games")
+    lo = teams.projected_wins < teams.wins - 1e-9
+    hi = teams.projected_wins > teams.wins + teams.remaining + 1e-9
+    if (lo | hi).any():
+        problems.append("projected_wins outside [wins, wins + remaining] for "
+                        + ", ".join(teams.team[lo | hi]))
+    # the record the table shows must be the record the evidence implies
+    w_from_games = pd.concat([played.home_team[played.home_margin > 0],
+                              played.away_team[played.home_margin < 0]]).value_counts()
+    l_from_games = pd.concat([played.away_team[played.home_margin > 0],
+                              played.home_team[played.home_margin < 0]]).value_counts()
+    t = teams.set_index("team")
+    if not (t.wins.eq(w_from_games.reindex(t.index).fillna(0).astype(int)).all()
+            and t.losses.eq(l_from_games.reindex(t.index).fillna(0).astype(int)).all()):
+        problems.append("team wins/losses disagree with the settled games")
+    if (played.home_margin == 0).any():
+        problems.append("a settled game with a zero margin reached the model")
+    if problems:
+        raise SystemExit("snapshot failed its own checks — nothing sealed: " + "; ".join(problems))
 
 
 # --------------------------------------------------------------------------- snapshot
@@ -302,11 +274,13 @@ def snapshot(season: int, label: str = DEFAULT_LABEL, results: pd.DataFrame | No
     Returns the new snapshot dir, or None when nothing new has settled (no write)."""
     model = load_model(season, label)
     b, strength = model["coef"], model["strength"]
-    sched = load_schedule(season)
-    if results is None:
-        results = settled_games(season)
+    raw = fetch_games(season) if results is None else results
     # frozen orientation, results aligned by team; home_ind is -1 where CFBD flipped the host
-    sched = align_results(sched, results)
+    sched, drift = reconcile(load_schedule(season), raw)
+    report = validate(sched, raw)
+    if not report["ok"]:
+        print("  snapshot: results quarantined — refusing to seal a snapshot on them")
+        return None
     played = sched[sched.settled].copy()
     played["home_margin"] = played.home_points - played.away_points
 
@@ -351,7 +325,9 @@ def snapshot(season: int, label: str = DEFAULT_LABEL, results: pd.DataFrame | No
     teams["projected_rank"] = teams.index + 1
     teams["rating_rank"] = teams.rating.rank(ascending=False, method="min").astype(int)
 
-    now = datetime.now(timezone.utc)
+    check_snapshot(sched, teams, played)   # raises before anything is written
+
+    now = datetime.now(UTC)
     dst = snap_root / now.strftime("%Y-%m-%dT%H-%MZ")
     if dst.exists():
         raise SystemExit(f"snapshot already exists for this minute: {dst}")
@@ -371,12 +347,17 @@ def snapshot(season: int, label: str = DEFAULT_LABEL, results: pd.DataFrame | No
         "n_settled": int(len(played)), "n_games": int(len(sched)),
         "through_week": int(played.week.max()) if len(played) else 0,
         "immutable": True,
-        "scoring_rule": "a game counts toward this snapshot's accuracy only if generated_at precedes kickoff",
+        "scoring_rule": ("a game counts toward this snapshot's accuracy only if generated_at "
+                         "precedes kickoff"),
+        "results_validation": {"ok": True, "checked_at": report["checked_at"],
+                               "hard_checks": [c["id"] for c in report["checks"]
+                                               if c["severity"] == "hard"]},
+        "schedule_drift": {k: len(v) for k, v in drift.items() if isinstance(v, list)},
         "files": files,
     }
     (dst / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     top = teams.sort_values("rating", ascending=False).iloc[0]
-    print(f"  snapshot -> {dst.relative_to(REPO_ROOT)}: {len(played)}/{len(sched)} results in; "
+    print(f"  snapshot -> {_rel(dst)}: {len(played)}/{len(sched)} results in; "
           f"top rating {top.team} ({top.rating:+.1f})")
     return dst
 

@@ -27,6 +27,36 @@ forward-only from its own `generated_at`. The **live series** takes, for every g
 snapshot that predates its kickoff — the forecast a reader following the season actually saw.
 The model itself is never refitted inside a series: a better model is a new version.
 
+## Validation gates — what every refresh checks before it scores or seals anything
+
+The frozen schedule is the registry's **key space** (the 740 games every version predicts).
+Everything else about a game is live and changes after a freeze: CFBD re-designates neutral-site
+hosts, moves games to the other team's field, resolves placeholder kickoff times, re-keys a
+postponed game under a new id, drops cancelled games. The refresh therefore never trusts the
+frozen copy for anything but identity, and it runs three gates in order
+(`cfb_analytics.registry.verify` → `results.reconcile` → `results.validate`; all reported on the
+scoreboard under **Data integrity** and written to `data/gold/forecast_checks.json`):
+
+| Gate | Check | On failure |
+|---|---|---|
+| Registry | every sealed file's SHA-256 and row count match its manifest | workflow fails; nothing sealed |
+| Registry | snapshot directories are timestamped, monotone, postdate their model, predict exactly the frozen game list; no duplicate frozen ids | workflow fails; nothing sealed |
+| Reconcile | results are matched **by team**, in the frozen orientation (`mirrored` = host re-designated, points swapped; `-1` home indicator when a non-neutral game moved to the other team's field) | — (handled) |
+| Reconcile | a frozen id CFBD dropped is re-keyed to the unique CFBD game between the same two teams; otherwise `missing` (never settles, never counts) | soft note on the page |
+| Reconcile | the before-kickoff rule uses CFBD's **current** kickoff, not the frozen one | — (handled) |
+| Validate (hard) | the winner our frame names = the winner CFBD names, for every settled game | **quarantine** |
+| Validate (hard) | per-team W-L derived from our frame = W-L derived independently from CFBD's rows by team name | **quarantine** |
+| Validate (hard) | no result before its kickoff; no ties; scores are non-negative integers with a plausible total; no CFBD id claimed twice | **quarantine** |
+| Validate (soft) | CFBD's own postgame win probability names its scored winner; changed pairings; missing / re-keyed games; kickoff moves | noted on the page |
+| Snapshot | before writing: ratings finite, probabilities in (0, 1), wins + losses + remaining = games, projected wins within [wins, wins + remaining], the team table's record equals the settled games' | refuses to seal |
+
+**Quarantine** means: the page is still rebuilt with the frozen predictions intact and a banner,
+nothing from that pull is scored, no snapshot is sealed, the flagged page is committed, and the
+`score` workflow then fails so it is noticed. The next clean pull resumes normally. The gates are
+unit-tested (`tests/test_results.py`, `tests/test_registry.py`, `tests/test_snapshot_guard.py`)
+and CI (`.github/workflows/ci.yml`) runs those tests, the registry gate and a keyless build on
+every push; the scheduled refresh runs the tests again before trusting the gates.
+
 ## Errata
 
 Withdrawing a sealed file is the one exception to immutability, and it is recorded here so the

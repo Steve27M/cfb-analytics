@@ -21,7 +21,7 @@ import json
 import os
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import duckdb
 import numpy as np
@@ -175,8 +175,8 @@ def freeze(season: int, label: str) -> None:
         "season": season,
         "season_type": "regular",
         "model": "priors_winprob",
-        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "frozen_at": datetime.now(timezone.utc).date().isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
+        "frozen_at": datetime.now(UTC).date().isoformat(),
         "source_commit": sha,
         "priors_season": season - 1,
         "scope": "FBS-vs-FBS regular-season games only; FCS opponents carry no prediction",

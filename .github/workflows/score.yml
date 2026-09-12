@@ -1,9 +1,13 @@
-# Scoreboard refresh: let the sealed in-season model take a new snapshot when results have
-# settled, score every frozen forecast version against those results and republish
-# docs/forecast.html. One CFBD API call per run (polite UA), daily during the
-# three times a day in season (Aug-Dec) — ~90 calls/month against the 1,000/month free-tier quota. This is the
-# project's only scheduled collection; the warehouse/model pipeline stays on-demand.
-# Once the last predicted game settles, the page stops changing and commits stop naturally.
+# Scoreboard refresh: verify the registry, pull + reconcile + validate the season's results, let
+# the sealed in-season model take a new snapshot when validated results have settled, score every
+# frozen forecast version and republish docs/forecast.html. One CFBD API call per run (polite UA),
+# three times a day in season (Aug-Dec) — ~90 calls/month against the 1,000/month free-tier quota.
+# This is the project's only scheduled collection; the warehouse/model pipeline stays on-demand.
+#
+# Failure policy: a hard data-integrity failure QUARANTINES the pull — the build still writes the
+# page (frozen predictions intact, banner + failing check shown) and exits 2. That flagged page is
+# committed so readers see the state, and THEN the job fails so GitHub notifies on it. Nothing is
+# sealed or scored from a quarantined pull; the next clean run resumes normally.
 name: score
 
 on:
@@ -30,7 +34,12 @@ jobs:
         with:
           enable-cache: true
 
-      - name: Build the forecast scoreboard
+      - name: Unit tests (the gates must be green before they gate anything)
+        run: uv run python -m pytest tests -q
+
+      - name: Build the forecast scoreboard (verify registry -> reconcile -> validate -> snapshot -> score)
+        id: build
+        continue-on-error: true
         env:
           CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
         run: uv run python dashboard/build_forecast.py
@@ -44,9 +53,17 @@ jobs:
           git config user.name "gridironiq-bot"
           git config user.email "gridironiq-bot@users.noreply.github.com"
           git add docs/forecast.html predictions/
-          if git status --porcelain -- predictions/ | grep -q .; then
+          if [ "${{ steps.build.outcome }}" != "success" ]; then
+            git commit -m "score: results QUARANTINED — integrity check failed $(date -u +%F)"
+          elif git status --porcelain -- predictions/ | grep -q .; then
             git commit -m "score: in-season snapshot + scoreboard refresh $(date -u +%F)"
           else
             git commit -m "score: scoreboard refresh $(date -u +%F)"
           fi
           git push
+
+      - name: Fail loudly if the build's integrity gate tripped
+        if: steps.build.outcome != 'success'
+        run: |
+          echo "::error::build_forecast.py exited non-zero — results quarantined or registry integrity failure. See data integrity on the page and the build step log."
+          exit 1

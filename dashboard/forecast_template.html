@@ -113,6 +113,24 @@
   footer{margin-top:44px;font:500 12px/1.7 'Space Grotesk';color:var(--sub);}
   footer a{color:var(--a);}
   @media(max-width:760px){.mrow{grid-template-columns:1fr 1fr;}}
+  /* data integrity */
+  .quarantine{margin:22px 0 0;padding:14px 18px;border-radius:12px;border:1px solid var(--bad);
+    background:color-mix(in srgb,var(--bad) 12%,var(--panel));font:500 13.5px/1.6 'Space Grotesk';}
+  .quarantine b{color:var(--bad);}
+  .chip.ok{color:var(--aText);background:var(--good);}
+  .chip.fail{color:#fff;background:var(--bad);}
+  .chip.note{color:var(--aText);background:var(--warn);}
+  .chip.quiet{color:var(--sub);border:1px solid var(--border);}
+  .checks{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;}
+  .checks .card h3{font:700 11px 'Space Grotesk';letter-spacing:.12em;text-transform:uppercase;color:var(--sub);margin:0 0 10px;}
+  .checks table{width:100%;border-collapse:collapse;}
+  .checks td{padding:6px 4px;border-bottom:1px solid var(--border);font:400 12.5px/1.45 'Space Grotesk';vertical-align:top;}
+  .checks td:last-child{text-align:right;white-space:nowrap;}
+  .checks .det{display:block;font:400 11px 'JetBrains Mono';color:var(--sub);margin-top:2px;word-break:break-word;}
+  .checks .sev{font:600 9px 'JetBrains Mono';color:var(--sub);margin-left:6px;}
+  .drift li{font:400 12.5px/1.5 'Space Grotesk';color:var(--sub);margin:3px 0;}
+  .drift li b{color:var(--text);font-weight:600;}
+  .drift .k{font:600 10px 'JetBrains Mono';letter-spacing:.06em;text-transform:uppercase;color:var(--a);margin-right:6px;}
 </style>
 </head>
 <body>
@@ -138,6 +156,7 @@
     where they can't be quietly edited. This page scores them against reality all season. The models
     keep improving; the originals stay untouched — and at the end of the year, they answer for themselves.</p>
     <div class="statusbar" id="status"></div>
+    <div id="quarantine"></div>
   </div>
 
   <div class="rules card">
@@ -147,6 +166,10 @@
     <i>after</i> it was created — no version ever gets credit for a game it could have known the result of.
     &nbsp;<span class="tick">✓</span> <b>Scope.</b> FBS-vs-FBS regular-season games only; games against FCS
     opponents carry no prediction and don't count for or against any version.
+    &nbsp;<span class="tick">✓</span> <b>Checked before scored.</b> Every refresh verifies the registry's
+    hashes, reconciles the live schedule against the frozen one <i>by team</i> (hosts, kickoffs and game
+    ids all change after a freeze), and validates the results; a failed check quarantines the pull —
+    nothing is sealed or scored from it, and it says so below.
   </div>
 
   <div class="sec"><h2>Model accuracy</h2><span class="line"></span></div>
@@ -180,6 +203,9 @@
     <span class="pill" id="gcount"></span>
   </div>
   <div class="card" style="padding:0;" id="games"></div>
+
+  <div class="sec"><h2>Data integrity</h2><span class="line"></span></div>
+  <div class="checks" id="checks"></div>
 
   <footer>
     Predictions are this project's own derived model outputs, frozen under
@@ -352,7 +378,8 @@ function weekBars(weekly){
         right = `<span class="chip ${hit?'hit':'miss'}">${hit?'model right':'model wrong'}</span>`;
         score = `${g.hp}–${g.ap}`;
       } else {
-        right = `<span class="chip wait">not played</span>`;
+        right = g.gone ? `<span class="chip note" title="CFBD no longer lists this game — cancelled, or not yet re-keyed">off schedule</span>`
+                       : `<span class="chip wait">not played</span>`;
       }
       const upd = ('pl' in g) ? ` · now ${fmtPct(favHome?g.pl:1-g.pl)}${'pm' in g?` (${g.pm>=0?g.home:g.away} by ${Math.abs(g.pm).toFixed(1)})`:''}` : '';
       return `<div class="gamecard"><span class="dt">${g.date.slice(5)}${g.neutral?' · N':''}</span>
@@ -367,6 +394,47 @@ function weekBars(weekly){
   document.getElementById('gq').addEventListener('input', e=>{
     wsel.value = e.target.value.trim() ? 'all' : String(defWeek); render(); });
   render();
+})();
+</script>
+<script>
+/* ---- data integrity: what every refresh checked, and what drifted since the freeze ---- */
+(function(){
+  const C = DATA.checks || {};
+  const st = document.getElementById('status');
+  if(DATA.quarantined){
+    st.insertAdjacentHTML('beforeend', `<span class="pill" style="color:var(--bad);border-color:var(--bad);">results quarantined</span>`);
+    document.getElementById('quarantine').innerHTML = `<div class="quarantine"><b>Results quarantined.</b>
+      The latest CFBD pull failed a hard integrity check, so this build scored <b>nothing</b> from it and sealed no
+      snapshot: the frozen predictions below are intact, the accuracy figures are from the last good build's
+      registry state, and the failing check is listed under <a href="#checks">Data integrity</a>. The refresh
+      workflow is failing on purpose until it is resolved.</div>`;
+  }
+  if(DATA.dropped) st.insertAdjacentHTML('beforeend', `<span class="pill"><b>${DATA.dropped}</b> off schedule</span>`);
+  const el = document.getElementById('checks');
+  if(!C.registry){ el.innerHTML = `<div class="card">No checks recorded for this build.</div>`; return; }
+  const chip = c => c.ok ? `<span class="chip ok">pass</span>`
+                         : (c.severity==='soft' ? `<span class="chip note">${c.n} noted</span>` : `<span class="chip fail">${c.n} failed</span>`);
+  const row = c => `<tr><td>${c.name}${c.severity?`<span class="sev">${c.severity.toUpperCase()}</span>`:''}${c.detail?`<span class="det">${c.detail}</span>`:''}</td><td>${chip(c)}</td></tr>`;
+  const reg = C.registry, res = C.results || {checks:[]}, d = C.drift || {counts:{},rows:{}};
+  const hard = res.checks.filter(c=>c.severity==='hard'), soft = res.checks.filter(c=>c.severity==='soft');
+  const name = g => `${g.away} ${g.neutral?'vs':'at'} ${g.home} <span class="sev">wk ${g.wk}</span>`;
+  const driftRows = [];
+  for(const g of (d.rows.mirrored||[])) driftRows.push(`<li><span class="k">host re-designated</span>${name(g)} — CFBD now lists <b>${g.away}</b> as home; scored by team</li>`);
+  for(const g of (d.rows.rekeyed||[]))  driftRows.push(`<li><span class="k">re-keyed</span>${name(g)} — now CFBD game ${g.cfbd_id}; matched by the two teams</li>`);
+  for(const g of (d.rows.missing||[]))  driftRows.push(`<li><span class="k">off schedule</span>${name(g)} — CFBD no longer lists it; never settles, doesn't count</li>`);
+  for(const g of (d.rows.changed||[]))  driftRows.push(`<li><span class="k">teams changed</span>${name(g)} — CFBD lists ${g.cfbd_away} at ${g.cfbd_home}; left unsettled</li>`);
+  for(const g of (d.rows.neutral_changed||[])) driftRows.push(`<li><span class="k">neutral flag</span>${name(g)} — CFBD now says neutral = ${g.cfbd_neutral}</li>`);
+  for(const g of (d.rows.week_moved||[])) driftRows.push(`<li><span class="k">week moved</span>${name(g)} — CFBD now has week ${g.cfbd_week}</li>`);
+  const kicks = d.counts.kickoff_moved || 0;
+  el.innerHTML = `
+    <div class="card"><h3>Registry · ${reg.n_versions} version${reg.n_versions===1?'':'s'}, ${reg.n_snapshots} snapshot${reg.n_snapshots===1?'':'s'}</h3>
+      <table>${reg.checks.map(row).join('')}</table></div>
+    <div class="card"><h3>Results · ${res.n_settled ?? 0} settled${C.results_available?'':' · no pull this build'}</h3>
+      <table>${hard.map(row).join('')}${soft.map(row).join('')}</table></div>
+    <div class="card drift"><h3>Schedule drift since the freeze · ${d.n_listed ?? 0}/${d.n_frozen ?? 0} frozen games listed by CFBD</h3>
+      ${driftRows.length ? `<ul style="margin:0;padding-left:18px;">${driftRows.join('')}</ul>` : `<div class="empty" style="padding:6px 0;">No identity-level changes.</div>`}
+      <div style="margin-top:10px;font:400 12px 'Space Grotesk';color:var(--sub);">${kicks} kickoff time${kicks===1?'':'s'} differ from the frozen schedule (placeholders resolved, TV moves); the before-kickoff rule always uses the live time.</div>
+    </div>`;
 })();
 </script>
 </body>
