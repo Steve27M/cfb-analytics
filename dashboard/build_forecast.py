@@ -119,14 +119,10 @@ def build() -> dict:
 
     versions = _load_versions()
     original = versions[0]
-    games = original["games"].copy()          # one canonical game frame: the frozen 740
-    games["start_ts"] = games.start_date.map(_iso)
-    if len(results):
-        games = games.merge(results, on="game_id", how="left")
-    else:
-        games[["home_points", "away_points", "completed"]] = None
-    games["settled"] = (games.completed.fillna(False).astype(bool)
-                        & games.home_points.notna() & games.away_points.notna())
+    # one canonical game frame: the frozen 740, results aligned by team into the frozen
+    # orientation, kickoff = CFBD's current start time (the before-kickoff rule uses it)
+    games = inseason.align_results(original["games"].copy(), results)
+    games["start_ts"] = games.kickoff.map(_iso)
     games.loc[games.settled, "home_won"] = (
         games.loc[games.settled, "home_points"] > games.loc[games.settled, "away_points"])
 
@@ -196,10 +192,12 @@ def build() -> dict:
     # per-game rows: original prob, plus the live updated prob/margin when a snapshot preceded it
     live_by_id = live.set_index("game_id") if live is not None and len(live) else None
     game_rows = []
-    for _, g in games.sort_values(["week", "start_date"]).iterrows():
-        r = {"id": int(g.game_id), "wk": int(g.week), "date": g.start_date[:10],
+    for _, g in games.sort_values(["week", "kickoff"]).iterrows():
+        r = {"id": int(g.game_id), "wk": int(g.week), "date": g.kickoff[:10],
              "home": g.home_team, "away": g.away_team,
              "neutral": bool(g.neutral_site), "p": round(float(g.home_win_prob), 3)}
+        if bool(g.flipped) and not bool(g.neutral_site):
+            r["host"] = g.away_team      # CFBD moved the game to the frozen away team's field
         if live_by_id is not None and g.game_id in live_by_id.index:
             lv = live_by_id.loc[g.game_id]
             r["pl"] = round(float(lv.home_win_prob), 3)

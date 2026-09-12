@@ -27,6 +27,22 @@ forward-only from its own `generated_at`. The **live series** takes, for every g
 snapshot that predates its kickoff — the forecast a reader following the season actually saw.
 The model itself is never refitted inside a series: a better model is a new version.
 
+## Errata
+
+Withdrawing a sealed file is the one exception to immutability, and it is recorded here so the
+history stays legible (git keeps the withdrawn files; nothing is rewritten).
+
+- **2026-09-12 — `v2-inseason` snapshots `2026-09-07T08-24Z`, `2026-09-08T08-09Z` and
+  `2026-09-12T07-58Z` withdrawn.** CFBD re-designated the home team of the week-1 Notre
+  Dame–Wisconsin game at Lambeau Field (frozen as Wisconsin home, settled as Notre Dame home,
+  41–13) after the schedule was sealed. The refresh attached CFBD's home score to the *frozen*
+  home team, so the model was fed a 28-point Wisconsin win instead of a 28-point Notre Dame win,
+  and every rating in those three snapshots — and the scoreboard's record for both teams — was
+  built on that reversed result. Results are now aligned by team, not by orientation
+  (`inseason.align_results`, covered by `tests/test_inseason_results.py`), the before-kickoff rule
+  uses CFBD's current kickoff time rather than the frozen one, and the next refresh re-snapshots
+  from the corrected results. The `2026-09-06T11-24Z` snapshot predates the game and stands.
+
 ## Why this is publishable
 
 These are derived outputs authored by this project (model probabilities and win projections),

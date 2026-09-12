@@ -66,7 +66,8 @@ def ridge_ratings(played: pd.DataFrame, strength: pd.Series, k: float, gamma: fl
 
     Solves min sum_g (margin_g - home_adv*home_ind_g - (r_h - r_a))^2 + k*sum_T (r_T - gamma*s_T)^2
     in closed form. strength: Series of preseason strength indexed by team; played needs
-    home_team, away_team, home_margin, home_ind. With no games the ratings ARE the prior."""
+    home_team, away_team, home_margin, home_ind (+1 home team hosts, -1 away team hosts, 0
+    neutral). With no games the ratings ARE the prior."""
     teams = strength.index.to_list()
     idx = {t: i for i, t in enumerate(teams)}
     prior = gamma * strength.to_numpy(float)
@@ -91,7 +92,8 @@ def settled_games(season: int) -> pd.DataFrame:
     # strip a UTF-8 BOM: a BOM-prefixed key (Windows-written .env pasted into a CI secret)
     # is invisible in every UI but breaks latin-1 header encoding
     key = os.getenv("CFBD_API_KEY", "").strip().lstrip("\ufeff")
-    cols = ["game_id", "home_points", "away_points", "completed"]
+    cols = ["game_id", "home_team", "away_team", "start_date", "home_points", "away_points",
+            "completed"]
     if not key:
         print("  CFBD_API_KEY not set — continuing without results")
         return pd.DataFrame(columns=cols)
@@ -103,10 +105,66 @@ def settled_games(season: int) -> pd.DataFrame:
     except Exception as e:  # noqa: BLE001 — the page must still build offline
         print(f"  results pull failed ({e}) — continuing without results")
         return pd.DataFrame(columns=cols)
+    # carry CFBD's CURRENT home/away designation and kickoff: both can change after the
+    # schedule was frozen, and align_results() reconciles them against the frozen orientation
     return pd.DataFrame([{
-        "game_id": g["id"], "home_points": g.get("homePoints"),
-        "away_points": g.get("awayPoints"), "completed": bool(g.get("completed")),
-    } for g in resp.json()])
+        "game_id": g["id"], "home_team": g.get("homeTeam"), "away_team": g.get("awayTeam"),
+        "start_date": g.get("startDate"),
+        "home_points": g.get("homePoints"), "away_points": g.get("awayPoints"),
+        "completed": bool(g.get("completed")),
+    } for g in resp.json()], columns=cols)
+
+
+def align_results(sched: pd.DataFrame, results: pd.DataFrame) -> pd.DataFrame:
+    """Attach settled results to the frozen schedule, in the schedule's own home/away orientation.
+
+    Games are matched by id, but CFBD can re-orient a game after the schedule was frozen — the
+    2026 Notre Dame–Wisconsin game at Lambeau Field was frozen as Wisconsin (home) vs Notre Dame
+    and settled as Notre Dame (home) 41, Wisconsin 13. Taking homePoints as the frozen home
+    team's score would flip that result. So points are aligned by TEAM: swapped when CFBD's
+    orientation mirrors the frozen one, and left unsettled (with a warning) when the teams no
+    longer match at all.
+
+    Adds per game: home_points/away_points (frozen orientation), completed, settled, flipped,
+    home_ind (+1 the frozen home team hosts, -1 the frozen away team hosts, 0 neutral site) and
+    kickoff — CFBD's current start time, falling back to the frozen one — for the before-kickoff
+    rule, so a game whose kickoff moved is never scored on a forecast made after it was played.
+    """
+    out = sched.copy()
+    if len(results):
+        r = results.rename(columns={"home_team": "cfbd_home", "away_team": "cfbd_away",
+                                    "start_date": "cfbd_start"})
+        out = out.merge(r, on="game_id", how="left")
+    else:
+        for c in ("cfbd_home", "cfbd_away", "cfbd_start", "home_points", "away_points",
+                  "completed"):
+            out[c] = None
+    same = (out.cfbd_home == out.home_team) & (out.cfbd_away == out.away_team)
+    flipped = (out.cfbd_home == out.away_team) & (out.cfbd_away == out.home_team)
+    unmatched = out.cfbd_home.notna() & ~same & ~flipped
+    if unmatched.any():
+        bad = out[unmatched]
+        print(f"  WARNING: {len(bad)} game(s) whose teams no longer match the frozen schedule — "
+              "left unsettled: " + "; ".join(
+                  f"{int(g.game_id)} frozen {g.home_team}/{g.away_team} vs CFBD "
+                  f"{g.cfbd_home}/{g.cfbd_away}" for g in bad.itertuples()))
+        out.loc[unmatched, ["home_points", "away_points"]] = None
+        out.loc[unmatched, "completed"] = False
+    if flipped.any():
+        hp, ap = out.home_points.copy(), out.away_points.copy()
+        out.loc[flipped, "home_points"] = ap[flipped]
+        out.loc[flipped, "away_points"] = hp[flipped]
+        print(f"  {int(flipped.sum())} game(s) re-oriented by CFBD since the freeze — results "
+              "aligned by team: " + "; ".join(
+                  f"{int(g.game_id)} {g.away_team} at {g.home_team}"
+                  + (" (N)" if g.neutral_site else "") for g in out[flipped].itertuples()))
+    out["flipped"] = flipped.to_numpy()
+    out["settled"] = (out.completed.fillna(False).astype(bool)
+                      & out.home_points.notna() & out.away_points.notna())
+    out["home_ind"] = np.where(out.neutral_site.astype(bool), 0.0,
+                               np.where(out.flipped, -1.0, 1.0))
+    out["kickoff"] = out.cfbd_start.where(out.cfbd_start.notna(), out.start_date)
+    return out.drop(columns=["cfbd_home", "cfbd_away", "cfbd_start"])
 
 
 # --------------------------------------------------------------------------- helpers
@@ -247,11 +305,8 @@ def snapshot(season: int, label: str = DEFAULT_LABEL, results: pd.DataFrame | No
     sched = load_schedule(season)
     if results is None:
         results = settled_games(season)
-    sched = sched.merge(results, on="game_id", how="left") if len(results) else sched.assign(
-        home_points=None, away_points=None, completed=None)
-    sched["settled"] = (sched.completed.fillna(False).astype(bool)
-                        & sched.home_points.notna() & sched.away_points.notna())
-    sched["home_ind"] = (~sched.neutral_site.astype(bool)).astype(float)
+    # frozen orientation, results aligned by team; home_ind is -1 where CFBD flipped the host
+    sched = align_results(sched, results)
     played = sched[sched.settled].copy()
     played["home_margin"] = played.home_points - played.away_points
 

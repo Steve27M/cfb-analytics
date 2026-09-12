@@ -7,6 +7,8 @@ echo "== ruff =="
 uv run ruff check .
 echo "== mypy =="
 uv run mypy src
+echo "== pytest =="
+uv run python -m pytest tests -q
 echo "== dbt build =="
 uv run dbt build --project-dir transform --profiles-dir transform
 echo "== dbt source freshness =="

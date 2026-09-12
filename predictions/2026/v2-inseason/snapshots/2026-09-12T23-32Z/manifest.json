@@ -1,0 +1,24 @@
+{
+  "version": "v2-inseason",
+  "snapshot": "2026-09-12T23-32Z",
+  "season": 2026,
+  "model": "inseason_winprob",
+  "generated_at": "2026-09-12T23:32:42+00:00",
+  "source_commit": "9acd9885ffe7e17f9be7e2ee656a30de47aedd0c",
+  "results_hash": "ac87e38939469db4edd99cbf57e095a1d40f05b0e5118fb36eaca7e2c5e1c8db",
+  "n_settled": 73,
+  "n_games": 740,
+  "through_week": 2,
+  "immutable": true,
+  "scoring_rule": "a game counts toward this snapshot's accuracy only if generated_at precedes kickoff",
+  "files": {
+    "forecast_2026.csv": {
+      "sha256": "9ef9fef315b8b987903e9c7786c0640db2c1177ee5743fd7f2881b5bbfa4803d",
+      "rows": 740
+    },
+    "forecast_2026_teams.csv": {
+      "sha256": "5e00014ffd347a60cd478fc334d9efcb894d323c6db85681e55a6442322dca71",
+      "rows": 136
+    }
+  }
+}

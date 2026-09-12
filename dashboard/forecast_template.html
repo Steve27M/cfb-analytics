@@ -356,7 +356,7 @@ function weekBars(weekly){
       }
       const upd = ('pl' in g) ? ` · now ${fmtPct(favHome?g.pl:1-g.pl)}${'pm' in g?` (${g.pm>=0?g.home:g.away} by ${Math.abs(g.pm).toFixed(1)})`:''}` : '';
       return `<div class="gamecard"><span class="dt">${g.date.slice(5)}${g.neutral?' · N':''}</span>
-        <span class="match">${g.away} at <span class="${favHome?'fav':''}">${g.home}</span></span>
+        <span class="match">${g.away} ${g.host?'vs':'at'} <span class="${favHome?'fav':''}">${g.home}</span>${g.host?` <span class="dt" title="CFBD moved this game to the other team's field after the schedule was frozen">· at ${g.host}</span>`:''}</span>
         <span class="score">${score}</span>
         <span class="prob">${fav} ${fmtPct(favP)}${upd}</span>${right}</div>`;
     }).join('') : `<div class="empty">No games match that filter.</div>`;
