@@ -33,7 +33,7 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
-      - name: Install (with the dev extra: ruff, mypy, pytest)
+      - name: "Install (with the dev extra: ruff, mypy, pytest)"
         run: uv sync --extra dev
 
       - name: Unit tests (the gates must be green before they gate anything)
