@@ -1,0 +1,46 @@
+{
+  "version": "v2-inseason",
+  "snapshot": "2026-09-13T08-20Z",
+  "season": 2026,
+  "model": "inseason_winprob",
+  "generated_at": "2026-09-13T08:20:23+00:00",
+  "source_commit": "34ae29d6c39896ffad35b07e38f1cb5dd2ca8335",
+  "results_hash": "0001eb3071b31efdf1bbffdc94db4817765049fdaeb209293c7d03402dc305b4",
+  "n_settled": 96,
+  "n_games": 740,
+  "through_week": 2,
+  "immutable": true,
+  "scoring_rule": "a game counts toward this snapshot's accuracy only if generated_at precedes kickoff",
+  "results_validation": {
+    "ok": true,
+    "checked_at": "2026-09-13T08:20:23+00:00",
+    "hard_checks": [
+      "winner-by-name",
+      "team-records",
+      "settled-after-kick",
+      "no-ties",
+      "points-sane",
+      "unique-ids"
+    ]
+  },
+  "schedule_drift": {
+    "mirrored": 5,
+    "rekeyed": 0,
+    "missing": 0,
+    "changed": 0,
+    "kickoff_moved": 46,
+    "week_moved": 0,
+    "neutral_changed": 0
+  },
+  "hash_rule": "sha256 of the file's bytes with CRLF normalized to LF",
+  "files": {
+    "forecast_2026.csv": {
+      "sha256": "5debfde4241849c8b79d0811a5b6cd0695611baf8de530aa35eff239103aff68",
+      "rows": 740
+    },
+    "forecast_2026_teams.csv": {
+      "sha256": "d20c9073a493956506d6de80a9909d22fa2bc3484265641bc52c53d65bf87abd",
+      "rows": 136
+    }
+  }
+}
