@@ -45,6 +45,9 @@ TEMPLATE = REPO_ROOT / "dashboard" / "forecast_template.html"
 OUT_HTML = REPO_ROOT / "docs" / "forecast.html"
 OUT_JSON = REPO_ROOT / "data" / "gold" / "forecast_page.json"
 OUT_CHECKS = REPO_ROOT / "data" / "gold" / "forecast_checks.json"
+# the same payload, published beside the page so other pages (compare.html's 2026 mode) can
+# fetch the live season to date; committed by the score workflow with the page
+OUT_DATA = REPO_ROOT / "docs" / "forecast_data.json"
 
 
 def _iso(ts: str) -> datetime:
@@ -248,11 +251,18 @@ def build() -> dict:
         "season_complete": n_settled + n_dropped == len(games) and n_settled > 0,
         "coinflip_brier": 0.25,
         "checks": checks,
+        # the sealed in-season model's win-probability map, so a page can turn a rating
+        # difference into a neutral-field probability exactly as the scoreboard does
+        "inseason": next(({"version": v["dir"],
+                           "coefficients": v["manifest"].get("coefficients"),
+                           "hyperparameters": v["manifest"].get("hyperparameters")}
+                          for v in versions if v["series"]), None),
     }
 
     OUT_JSON.parent.mkdir(parents=True, exist_ok=True)
     OUT_JSON.write_text(json.dumps(payload), encoding="utf-8")
     OUT_CHECKS.write_text(json.dumps(checks, indent=2), encoding="utf-8")
+    OUT_DATA.write_text(json.dumps(payload), encoding="utf-8", newline="\n")
     ov = scored_versions[-1]["overall"]
     n_snaps = sum(len(v.get("snapshots", [])) for v in series)
     print(f"  {len(versions)} version(s), {n_snaps} snapshot(s) · {n_settled}/{len(games)} games "

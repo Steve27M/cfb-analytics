@@ -72,6 +72,31 @@
   .dist .ex .chip b{font:700 12px 'Saira Condensed';color:var(--text);}
   .dist .ex .dot{width:7px;height:7px;border-radius:2px;}
   .empty{grid-column:1/-1;text-align:center;color:var(--sub);font:500 14px 'Space Grotesk';padding:40px;}
+  /* team highlight */
+  .toolbar select{font:600 13px 'Space Grotesk';padding:11px 14px;border-radius:12px;border:1px solid var(--border);background:var(--panel);color:var(--text);outline:none;cursor:pointer;max-width:260px;}
+  .toolbar select option{color:#111;background:#fff;}
+  .dist .track .you{position:absolute;top:-5px;width:4px;height:20px;margin-left:-2px;border-radius:2px;background:#ffd166;box-shadow:0 0 0 2px rgba(0,0,0,.45);}
+  .you-chip{display:inline-flex;align-items:center;gap:7px;margin-top:9px;padding:5px 10px;border-radius:999px;background:color-mix(in srgb,#ffd166 18%,var(--panel2));border:1px solid #ffd166;font:600 11.5px 'Space Grotesk';color:var(--text);}
+  .you-chip b{font:800 13px 'Saira Condensed';color:#ffd166;}
+  .you-chip .rk{font:600 10px 'JetBrains Mono';color:var(--sub);}
+  /* rankings dropdown */
+  details.rank{margin-top:6px;border-top:1px solid var(--border);padding-top:8px;}
+  details.rank summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;font:700 11px 'Space Grotesk';letter-spacing:.1em;text-transform:uppercase;color:var(--sub);user-select:none;}
+  details.rank summary::-webkit-details-marker{display:none;}
+  details.rank summary::before{content:'▸';font-size:12px;color:var(--a);transition:transform .15s;}
+  details.rank[open] summary::before{transform:rotate(90deg);}
+  details.rank summary:hover{color:var(--text);}
+  details.rank ol{list-style:none;margin:10px 0 0;padding:0;max-height:330px;overflow:auto;border:1px solid var(--border);border-radius:10px;background:var(--panel2);}
+  details.rank li{display:grid;grid-template-columns:34px 1fr 64px;align-items:center;gap:8px;padding:5px 10px;border-bottom:1px solid var(--border);font:500 12.5px 'Space Grotesk';}
+  details.rank li:last-child{border-bottom:none;}
+  details.rank li .n{font:600 11px 'JetBrains Mono';color:var(--sub);}
+  details.rank li .t{position:relative;min-width:0;padding:2px 0;}
+  details.rank li .t .bar{position:absolute;left:0;top:50%;height:4px;margin-top:9px;border-radius:2px;background:color-mix(in srgb,var(--a) 55%,transparent);}
+  details.rank li .t .nm{position:relative;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;}
+  details.rank li .v{font:600 12px 'JetBrains Mono';text-align:right;}
+  details.rank li.lead .n{color:var(--a);}
+  details.rank li.you{background:color-mix(in srgb,#ffd166 16%,var(--panel2));}
+  details.rank li.you .nm{color:#ffd166;font-weight:700;}
   footer{margin-top:44px;font:500 12px/1.7 'Space Grotesk';color:var(--sub);}
   footer a{color:var(--a);}
   @media(max-width:760px){.grid{grid-template-columns:1fr;}}
@@ -102,6 +127,9 @@
       <span style="color:var(--sub);font-size:15px;">🔎</span>
       <input id="q" type="text" placeholder="Search a stat — e.g. EPA, success rate, schedule…" autocomplete="off">
     </div>
+    <select id="teamSel" title="Highlight one team's value and rank on every stat">
+      <option value="">Highlight a team…</option>
+    </select>
     <span class="count" id="count"></span>
   </div>
 
@@ -125,13 +153,40 @@ const DIR = {
 
 document.getElementById('sub').textContent =
   `Every metric on the comparison dashboard, in plain English — what it measures, how to read it, `
-  + `and where each of the ${DATA.nTeams} FBS teams landed in ${DATA.season}.`;
+  + `and where each of the ${DATA.nTeams} FBS teams landed in ${DATA.season}. Open a stat's rankings to see every `
+  + `team best to worst, or highlight a team to mark it on every stat.`;
 document.getElementById('fseason').textContent = DATA.season;
+const teamSel = document.getElementById('teamSel');
+teamSel.innerHTML += (DATA.teams||[]).map(t=>`<option value="${t.name}">${t.name}</option>`).join('');
+let YOU = '';   // the highlighted team (name), '' for none
+(function(){ // deep link: glossary.html#team=Notre%20Dame
+  const t = new URLSearchParams(location.hash.replace(/^#/,'')).get('team');
+  if(t && (DATA.teams||[]).some(x=>x.name===t)){ YOU = t; teamSel.value = t; }
+})();
+
+function fmtVal(v, dec){ return (typeof v === 'number' ? v.toLocaleString(undefined,{maximumFractionDigits:dec}) : v); }
+function youRow(d){ if(!YOU || !d || !d.ranked) return null;
+  const i = d.ranked.findIndex(r=>r.name===YOU); return i<0 ? null : {rank:i+1, ...d.ranked[i]}; }
+
+function rankList(d, dir, dec){
+  if(!d || !d.ranked || !d.ranked.length) return '';
+  const span = (d.max - d.min) || 1, n = d.ranked.length;
+  const rows = d.ranked.map((r,i)=>{
+    let pct = (r.val - d.min) / span; if(dir !== 'high') pct = 1 - pct;     // best = full bar
+    const cls = (i<3?'lead ':'') + (r.name===YOU?'you':'');
+    const show = r.disp != null ? r.disp : (dir==='rank' ? '#'+fmtVal(r.val,dec) : fmtVal(r.val,dec));
+    return `<li class="${cls}"><span class="n">${i+1}</span><span class="t"><span class="bar" style="width:${(pct*100).toFixed(1)}%;"></span><span class="nm">${r.name}</span></span><span class="v">${show}</span></li>`;
+  }).join('');
+  return `<details class="rank"><summary>Rankings · best → worst · ${n} teams</summary><ol>${rows}</ol></details>`;
+}
 
 function distBar(d, dir, dec){
   if(!d) return '';
   const span = (d.max - d.min) || 1;
   const medPct = ((d.med - d.min) / span * 100).toFixed(1);
+  const you = youRow(d);
+  const youMark = you ? `<div class="you" style="left:${((you.val - d.min) / span * 100).toFixed(1)}%;" title="${you.name} ${fmtVal(you.val,dec)}"></div>` : '';
+  const youChip = you ? `<div class="you-chip">${you.abbr} <b>${you.disp != null ? you.disp : (dir==='rank' ? '#'+fmtVal(you.val,dec) : fmtVal(you.val,dec))}</b><span class="rk">rank ${you.rank} / ${d.ranked.length}</span></div>` : '';
   // for "higher is better" the top value leads; for "lower"/"rank" the bottom value leads
   const highGood = (dir === 'high');
   const leader = highGood ? d.hi : d.lo, trailer = highGood ? d.lo : d.hi;
@@ -139,12 +194,12 @@ function distBar(d, dir, dec){
   const badDot = '<span class="dot" style="background:var(--sub);"></span>';
   const fmt = v => (typeof v === 'number' ? v.toLocaleString(undefined,{maximumFractionDigits:dec}) : v);
   return `<div class="dist">
-    <div class="track"><div class="med" style="left:${medPct}%;" title="median ${fmt(d.med)}"></div></div>
+    <div class="track"><div class="med" style="left:${medPct}%;" title="median ${fmt(d.med)}"></div>${youMark}</div>
     <div class="ends"><span>min ${fmt(d.min)}</span><span>median ${fmt(d.med)}</span><span>max ${fmt(d.max)}</span></div>
     <div class="ex">
       <span class="chip">${goodDot}Leader <b>${leader.abbr} ${fmt(leader.val)}</b></span>
       <span class="chip">${badDot}Trailer <b>${trailer.abbr} ${fmt(trailer.val)}</b></span>
-    </div></div>`;
+    </div>${youChip}${rankList(d, dir, dec)}</div>`;
 }
 
 function cardHtml(s){
@@ -176,6 +231,7 @@ function render(filter){
 }
 
 document.getElementById('q').addEventListener('input', e=>render(e.target.value));
+teamSel.addEventListener('change', e=>{ YOU = e.target.value; history.replaceState(null,'',YOU?'#team='+encodeURIComponent(YOU):' '); render(document.getElementById('q').value); });
 render('');
 </script>
 </body>

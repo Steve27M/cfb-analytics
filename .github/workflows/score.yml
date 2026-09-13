@@ -48,13 +48,13 @@ jobs:
 
       - name: Commit the refreshed page + any new snapshot (only if something changed)
         run: |
-          if [ -z "$(git status --porcelain -- docs/forecast.html predictions/)" ]; then
+          if [ -z "$(git status --porcelain -- docs/forecast.html docs/forecast_data.json predictions/)" ]; then
             echo "no change — nothing to commit"
             exit 0
           fi
           git config user.name "gridironiq-bot"
           git config user.email "gridironiq-bot@users.noreply.github.com"
-          git add docs/forecast.html predictions/
+          git add docs/forecast.html docs/forecast_data.json predictions/
           if [ "${{ steps.build.outcome }}" != "success" ]; then
             git commit -m "score: results QUARANTINED — integrity check failed $(date -u +%F)"
           elif git status --porcelain -- predictions/ | grep -q .; then

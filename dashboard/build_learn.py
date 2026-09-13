@@ -33,19 +33,34 @@ MODELS_OUT = REPO_ROOT / "docs" / "models.html"
 # --------------------------------------------------------------------------- glossary
 
 
-def _dist(teams: list[dict], key: str, dec: int) -> dict | None:
-    """min/median/max of a numeric field across teams, with the leader & laggard team."""
-    vals = [(t[key], t["name"], t["abbr"]) for t in teams if t.get(key) is not None]
+def _val(t: dict, key: str):
+    """A field of a compare-page team, with dotted access into nested dicts (radar.exp)."""
+    v: object = t
+    for part in key.split("."):
+        v = v.get(part) if isinstance(v, dict) else None
+    return v
+
+
+def _dist(teams: list[dict], key: str, dec: int, direction: str = "high",
+          disp: str | None = None) -> dict | None:
+    """min/median/max of a numeric field across teams, the leader & laggard team, and every
+    team ranked best -> worst by the stat's direction (`ranked`), for the per-stat dropdown.
+    `disp` names a field whose string is shown instead of the number (e.g. the W-L record)."""
+    vals = [(_val(t, key), t["name"], t["abbr"], t.get(disp) if disp else None)
+            for t in teams if _val(t, key) is not None]
     if not vals:
         return None
     nums = [v[0] for v in vals]
     lo = min(vals, key=lambda v: v[0])
     hi = max(vals, key=lambda v: v[0])
+    ranked = sorted(vals, key=lambda v: v[0], reverse=(direction == "high"))
     return {
         "min": round(min(nums), dec), "med": round(median(nums), dec),
         "max": round(max(nums), dec),
         "hi": {"name": hi[1], "abbr": hi[2], "val": round(hi[0], dec)},
         "lo": {"name": lo[1], "abbr": lo[2], "val": round(lo[0], dec)},
+        "ranked": [{"name": v[1], "abbr": v[2], "val": round(v[0], dec),
+                    **({"disp": v[3]} if v[3] is not None else {})} for v in ranked],
     }
 
 
@@ -60,10 +75,10 @@ GLOSSARY_DEFS: list[tuple[str, list[dict]]] = [
          "read": "Positive is above average, negative below. A team rated +20 facing one rated +5 "
                  "is favored by ~15 on a neutral field. This is the single best summary of team "
                  "strength on the dashboard and drives the matchup projection."},
-        {"name": "SP+ Rank", "key": None, "dir": "rank",
+        {"name": "SP+ Rank", "key": "spRank", "dec": 0, "dir": "rank",
          "def": "The team's rank (1 = best) among all FBS teams by SP+ rating.",
          "read": "1 through ~136. Shown as the 'SP+ #' chip on the hero card."},
-        {"name": "Record", "key": None, "dir": "high",
+        {"name": "Record", "key": "winPct", "dec": 3, "dir": "high", "disp": "record",
          "def": "Wins–losses over the season (FBS games with a resolved result).",
          "read": "Context, not a ranking input — a 10–2 team in a weak league can rate below an "
                  "8–4 team in a brutal one. Read it next to Strength of Schedule."},
@@ -111,13 +126,13 @@ GLOSSARY_DEFS: list[tuple[str, list[dict]]] = [
         {"name": "Success Rate % (Def)", "key": "srDef", "dec": 0, "dir": "low",
          "def": "Share of opponent plays that were successful.",
          "read": "Lower is better. Shown on the efficiency split as the rate the defense allows."},
-        {"name": "Explosiveness", "key": None, "dir": "high",
+        {"name": "Explosiveness", "key": "radar.exp", "dec": 0, "dir": "high",
          "def": "The rate of explosive plays — snaps gaining 15+ yards (garbage time excluded).",
          "read": "The big-play dimension of an offense. On the radar it's a 0–100 percentile "
                  "versus FBS. High Success Rate + high Explosiveness is the ideal offense."},
     ]),
     ("Schedule & Talent", [
-        {"name": "Strength of Schedule", "key": None, "dir": "rank",
+        {"name": "Strength of Schedule", "key": "sosRank", "dec": 0, "dir": "rank",
          "def": "Rank by the average SP+ rating of the opponents a team actually played "
                 "(1 = toughest slate). Computed from opponents faced because SP+'s own SoS field "
                 "was empty for 2025.",
@@ -138,22 +153,22 @@ GLOSSARY_DEFS: list[tuple[str, list[dict]]] = [
                  "the season played out as expected.' The gauge on the dashboard visualizes it."},
     ]),
     ("Team Profile Radar (0–100 percentiles vs FBS)", [
-        {"name": "OFF", "key": None, "dir": "high",
+        {"name": "OFF", "key": "radar.off", "dec": 0, "dir": "high",
          "def": "Offensive EPA/play, ranked as a percentile across FBS.",
          "read": "100 = best offense in the country, 50 = median."},
-        {"name": "DEF", "key": None, "dir": "high",
+        {"name": "DEF", "key": "radar.def", "dec": 0, "dir": "high",
          "def": "Defensive EPA/play allowed, inverted so a higher percentile = a better defense.",
          "read": "100 = stingiest defense in FBS."},
-        {"name": "ST", "key": None, "dir": "high",
+        {"name": "ST", "key": "radar.st", "dec": 0, "dir": "high",
          "def": "Special-teams rating percentile (from SP+'s special-teams component).",
          "read": "Kicking, returns and field position, relative to FBS."},
-        {"name": "EXP", "key": None, "dir": "high",
+        {"name": "EXP", "key": "radar.exp", "dec": 0, "dir": "high",
          "def": "Explosive-play-rate percentile (15+ yard plays).",
          "read": "The big-play axis of the profile."},
-        {"name": "EFF", "key": None, "dir": "high",
+        {"name": "EFF", "key": "radar.eff", "dec": 0, "dir": "high",
          "def": "Offensive Success Rate percentile.",
          "read": "The stay-on-schedule / consistency axis."},
-        {"name": "TAL", "key": None, "dir": "high",
+        {"name": "TAL", "key": "radar.tal", "dec": 0, "dir": "high",
          "def": "Talent percentile from recruiting rank (better rank = higher percentile).",
          "read": "Roster-talent axis; the recruiting model links this to on-field results."},
     ]),
@@ -167,11 +182,13 @@ def build_glossary(teams: list[dict]) -> dict:
         for s in stats:
             entry = {"name": s["name"], "def": s["def"], "read": s["read"], "dir": s["dir"]}
             if s.get("key"):
-                entry["dist"] = _dist(teams, s["key"], s["dec"])
+                entry["dist"] = _dist(teams, s["key"], s["dec"], s["dir"], s.get("disp"))
                 entry["dec"] = s["dec"]
             out_stats.append(entry)
         groups.append({"name": gname, "stats": out_stats})
-    return {"season": SEASON, "nTeams": len(teams), "groups": groups}
+    roster = sorted(({"name": t["name"], "abbr": t["abbr"]} for t in teams),
+                    key=lambda t: t["name"])
+    return {"season": SEASON, "nTeams": len(teams), "groups": groups, "teams": roster}
 
 
 # --------------------------------------------------------------------------- models
