@@ -16,7 +16,6 @@ LABEL is refused, never overwritten — improve the model, freeze a NEW version.
 """
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import subprocess
@@ -28,6 +27,7 @@ import numpy as np
 import pandas as pd
 import requests
 
+from . import registry
 from .config import DUCKDB_PATH, REPO_ROOT
 from .db import read_only_conn
 
@@ -134,7 +134,7 @@ def forecast(season: int) -> pd.DataFrame:
 
 
 def _sha256(path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    return registry.sha256_text(path)
 
 
 def freeze(season: int, label: str) -> None:
@@ -150,7 +150,7 @@ def freeze(season: int, label: str) -> None:
     dst.mkdir(parents=True)
     files = {}
     for src in (src_games, src_teams):
-        (dst / src.name).write_bytes(src.read_bytes())
+        (dst / src.name).write_bytes(src.read_bytes().replace(b"\r\n", b"\n"))
         files[src.name] = {"sha256": _sha256(dst / src.name),
                            "rows": sum(1 for _ in open(dst / src.name, encoding="utf-8")) - 1}
     con = read_only_conn()
@@ -162,7 +162,7 @@ def freeze(season: int, label: str) -> None:
         """).fetch_df()
     finally:
         con.close()
-    coef.to_csv(dst / "coef__priors__r.csv", index=False)
+    coef.to_csv(dst / "coef__priors__r.csv", index=False, lineterminator="\n")
     files["coef__priors__r.csv"] = {"sha256": _sha256(dst / "coef__priors__r.csv"),
                                     "rows": len(coef)}
     try:
@@ -185,7 +185,9 @@ def freeze(season: int, label: str) -> None:
                          "precedes kickoff"),
         "files": files,
     }
-    (dst / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    manifest["hash_rule"] = registry.HASH_RULE
+    (dst / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8",
+                                       newline="\n")
     print(f"  frozen -> {dst.relative_to(REPO_ROOT)} (commit it to seal the timestamp)")
 
 

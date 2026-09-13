@@ -101,7 +101,11 @@ def align_results(sched: pd.DataFrame, results: pd.DataFrame) -> pd.DataFrame:
 
 # --------------------------------------------------------------------------- helpers
 def _sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    return registry.sha256_text(path)
+
+
+def _write_json(path: Path, obj: dict) -> None:
+    path.write_text(json.dumps(obj, indent=2) + "\n", encoding="utf-8", newline="\n")
 
 
 def _now() -> str:
@@ -175,12 +179,12 @@ def freeze_model(season: int, label: str = DEFAULT_LABEL) -> Path:
     m = dict(zip(metrics.metric, metrics.value, strict=True))
 
     dst.mkdir(parents=True)
-    coef.to_csv(dst / "coef__inseason__r.csv", index=False)
+    coef.to_csv(dst / "coef__inseason__r.csv", index=False, lineterminator="\n")
     ts = (strength.rename("strength").reset_index()
           .assign(prior_rating=lambda d: b["gamma"] * d.strength)
           .sort_values("prior_rating", ascending=False))
     ts["prior_rank"] = range(1, len(ts) + 1)
-    ts.to_csv(dst / "team_prior_strength.csv", index=False)
+    ts.to_csv(dst / "team_prior_strength.csv", index=False, lineterminator="\n")
 
     files = {
         "coef__inseason__r.csv": {
@@ -226,9 +230,10 @@ def freeze_model(season: int, label: str = DEFAULT_LABEL) -> Path:
                             "generated_at. The live series takes, for every game, the latest "
                             "snapshot that predates its kickoff."),
         "immutable": True,
+        "hash_rule": registry.HASH_RULE,
         "files": files,
     }
-    (dst / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    _write_json(dst / "manifest.json", manifest)
     print(f"  frozen model -> {_rel(dst)} (k={b['ridge_k']:g}, gamma="
           f"{b['gamma']:.2f}, home_adv={b['home_adv']:.2f}; holdout Brier {m['brier']:.4f} vs "
           f"priors-only {m['brier_priors']:.4f})")
@@ -335,8 +340,8 @@ def snapshot(season: int, label: str = DEFAULT_LABEL, results: pd.DataFrame | No
     games_out = sched[["game_id", "week", "start_date", "neutral_site", "home_team", "away_team",
                        "pred_margin", "home_win_prob", "favored_team", "favored_win_prob",
                        "forecast_season"]]
-    games_out.to_csv(dst / f"forecast_{season}.csv", index=False)
-    teams.to_csv(dst / f"forecast_{season}_teams.csv", index=False)
+    games_out.to_csv(dst / f"forecast_{season}.csv", index=False, lineterminator="\n")
+    teams.to_csv(dst / f"forecast_{season}_teams.csv", index=False, lineterminator="\n")
     files = {f.name: {"sha256": _sha256(f), "rows": sum(1 for _ in open(f, encoding="utf-8")) - 1}
              for f in (dst / f"forecast_{season}.csv", dst / f"forecast_{season}_teams.csv")}
     manifest = {
@@ -353,9 +358,10 @@ def snapshot(season: int, label: str = DEFAULT_LABEL, results: pd.DataFrame | No
                                "hard_checks": [c["id"] for c in report["checks"]
                                                if c["severity"] == "hard"]},
         "schedule_drift": {k: len(v) for k, v in drift.items() if isinstance(v, list)},
+        "hash_rule": registry.HASH_RULE,
         "files": files,
     }
-    (dst / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    _write_json(dst / "manifest.json", manifest)
     top = teams.sort_values("rating", ascending=False).iloc[0]
     print(f"  snapshot -> {_rel(dst)}: {len(played)}/{len(sched)} results in; "
           f"top rating {top.team} ({top.rating:+.1f})")

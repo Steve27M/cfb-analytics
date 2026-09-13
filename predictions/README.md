@@ -50,6 +50,13 @@ scoreboard under **Data integrity** and written to `data/gold/forecast_checks.js
 | Validate (soft) | CFBD's own postgame win probability names its scored winner; changed pairings; missing / re-keyed games; kickoff moves | noted on the page |
 | Snapshot | before writing: ratings finite, probabilities in (0, 1), wins + losses + remaining = games, projected wins within [wins, wins + remaining], the team table's record equals the settled games' | refuses to seal |
 
+**Hashes are line-ending-normalized.** Versions sealed before 2026-09-13 recorded the SHA-256
+of the bytes their Windows writer produced (CRLF) while git stores LF, so they only ever verified
+on a Windows checkout — CI caught this the first time the registry gate ran on Linux. New
+manifests carry `hash_rule` and hash LF-normalized bytes, `.gitattributes` pins `predictions/**`
+to LF on every platform, and verification accepts the sealed hash against the file's raw, LF- or
+CRLF-normalized bytes: a line-ending conversion is not tampering; any change to content still is.
+
 **Quarantine** means: the page is still rebuilt with the frozen predictions intact and a banner,
 nothing from that pull is scored, no snapshot is sealed, the flagged page is committed, and the
 `score` workflow then fails so it is noticed. The next clean pull resumes normally. The gates are

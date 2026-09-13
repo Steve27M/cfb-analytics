@@ -1,0 +1,6 @@
+# The prediction registry is sealed with SHA-256 manifests: its bytes must be identical on
+# every platform, so never convert its line endings on checkout.
+predictions/** text eol=lf
+# workflows and tests are read by Linux runners; keep them LF too
+.github/** text eol=lf
+tests/** text eol=lf

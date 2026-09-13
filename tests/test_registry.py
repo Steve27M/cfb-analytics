@@ -133,6 +133,28 @@ def test_duplicate_frozen_game_id_fails_scope(reg):
     assert not next(c for c in rep["checks"] if c["id"] == "frozen-scope")["ok"]
 
 
+def test_line_ending_conversion_is_not_tampering_but_content_change_is(reg):
+    """A checkout on another platform may flip CRLF/LF; the sealed hash must still verify.
+    Any change to the content must still fail."""
+    p = reg / "v1-preseason" / f"forecast_{SEASON}.csv"
+    lf = p.read_bytes().replace(b"\r\n", b"\n")
+    p.write_bytes(lf.replace(b"\n", b"\r\n"))
+    assert registry.verify(SEASON)["ok"]
+    p.write_bytes(lf)
+    assert registry.verify(SEASON)["ok"]
+    p.write_bytes(lf.replace(b"0.25", b"0.26"))
+    assert not registry.verify(SEASON)["ok"]
+
+
+def test_sha256_text_ignores_line_endings(tmp_path):
+    a, b = tmp_path / "a.csv", tmp_path / "b.csv"
+    a.write_bytes(b"x,y\n1,2\n")
+    b.write_bytes(b"x,y\r\n1,2\r\n")
+    assert registry.sha256_text(a) == registry.sha256_text(b)
+    assert registry.sha256(a) != registry.sha256(b)
+    assert registry.hash_matches(b, registry.sha256(a))
+
+
 def test_real_registry_is_intact():
     """The committed registry must always verify — this is the CI tripwire."""
     rep = registry.verify(SEASON)

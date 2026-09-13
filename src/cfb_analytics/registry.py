@@ -9,6 +9,13 @@ every file's SHA-256 matches its manifest (a silently edited or corrupted foreca
 snapshot timestamps are monotone and match their directory names, every snapshot predicts
 exactly the frozen game list, and the frozen schedule has no duplicate ids. A failing registry
 is reported on the page and fails the workflow; it is never "fixed" by a refresh.
+
+Hashes and line endings: every registry file is text. Versions sealed before 2026-09-13 were
+hashed over the bytes the writer produced on Windows (CRLF), while git stores LF — so those
+manifests only ever verified on a Windows checkout. New manifests hash LF-normalized bytes
+(`hash_rule`), `.gitattributes` pins predictions/** to LF on every platform, and verification
+accepts a file whose LF- or CRLF-normalized bytes match the sealed hash: a line-ending
+conversion is not tampering, any change to content still is.
 """
 from __future__ import annotations
 
@@ -24,8 +31,25 @@ PREDICTIONS_DIR = REPO_ROOT / "predictions"
 SCHEDULE_VERSION = "v1-preseason"   # the frozen game list + kickoff times every snapshot reuses
 
 
+HASH_RULE = "sha256 of the file's bytes with CRLF normalized to LF"
+
+
 def sha256(path: Path) -> str:
+    """Raw-byte SHA-256 (what pre-2026-09-13 manifests recorded)."""
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def sha256_text(path: Path) -> str:
+    """Line-ending-normalized SHA-256: the hash new manifests seal (see HASH_RULE)."""
+    return hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
+
+
+def hash_matches(path: Path, sealed: str) -> bool:
+    """True when the file's raw, LF-normalized or CRLF-normalized bytes hash to `sealed`."""
+    raw = path.read_bytes()
+    lf = raw.replace(b"\r\n", b"\n")
+    crlf = lf.replace(b"\n", b"\r\n")
+    return sealed in {hashlib.sha256(b).hexdigest() for b in (raw, lf, crlf)}
 
 
 def registry_dir(season: int) -> Path:
@@ -81,7 +105,7 @@ def _check_files(d: Path, manifest: dict, label: str, problems: list[str]) -> No
         if not p.exists():
             problems.append(f"{label}: {name} missing")
             continue
-        if meta.get("sha256") and sha256(p) != meta["sha256"]:
+        if meta.get("sha256") and not hash_matches(p, meta["sha256"]):
             problems.append(f"{label}: {name} SHA-256 does not match its manifest")
         if "rows" in meta and name.endswith(".csv"):
             n = sum(1 for _ in p.open(encoding="utf-8")) - 1
