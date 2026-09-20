@@ -97,6 +97,7 @@
   details.rank li.lead .n{color:var(--a);}
   details.rank li.you{background:color-mix(in srgb,#ffd166 16%,var(--panel2));}
   details.rank li.you .nm{color:#ffd166;font-weight:700;}
+  details.rank li a.nm:hover{text-decoration:underline;color:var(--a);}
   footer{margin-top:44px;font:500 12px/1.7 'Space Grotesk';color:var(--sub);}
   footer a{color:var(--a);}
   @media(max-width:760px){.grid{grid-template-columns:1fr;}}
@@ -106,6 +107,7 @@
 <div class="nav"><div class="in">
   <a class="brand" href="index.html"><span class="bar"></span><span class="txt">GRIDIRON<span style="color:var(--a);">IQ</span></span></a>
   <div class="navlinks">
+    <a href="team.html">Team Profiles</a>
     <a href="compare.html">Compare Teams</a>
     <a href="forecast.html">2026 Forecast</a>
     <a href="glossary.html" class="active">Stat Guide</a>
@@ -164,6 +166,7 @@ let YOU = '';   // the highlighted team (name), '' for none
   if(t && (DATA.teams||[]).some(x=>x.name===t)){ YOU = t; teamSel.value = t; }
 })();
 
+const slug=n=>n.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
 function fmtVal(v, dec){ return (typeof v === 'number' ? v.toLocaleString(undefined,{maximumFractionDigits:dec}) : v); }
 function youRow(d){ if(!YOU || !d || !d.ranked) return null;
   const i = d.ranked.findIndex(r=>r.name===YOU); return i<0 ? null : {rank:i+1, ...d.ranked[i]}; }
@@ -175,7 +178,7 @@ function rankList(d, dir, dec){
     let pct = (r.val - d.min) / span; if(dir !== 'high') pct = 1 - pct;     // best = full bar
     const cls = (i<3?'lead ':'') + (r.name===YOU?'you':'');
     const show = r.disp != null ? r.disp : (dir==='rank' ? '#'+fmtVal(r.val,dec) : fmtVal(r.val,dec));
-    return `<li class="${cls}"><span class="n">${i+1}</span><span class="t"><span class="bar" style="width:${(pct*100).toFixed(1)}%;"></span><span class="nm">${r.name}</span></span><span class="v">${show}</span></li>`;
+    return `<li class="${cls}"><span class="n">${i+1}</span><span class="t"><span class="bar" style="width:${(pct*100).toFixed(1)}%;"></span><a class="nm" href="team.html#team=${slug(r.name)}" title="Open the ${r.name.replace(/"/g,'&quot;')} team profile">${r.name}</a></span><span class="v">${show}</span></li>`;
   }).join('');
   return `<details class="rank"><summary>Rankings · best → worst · ${n} teams</summary><ol>${rows}</ol></details>`;
 }

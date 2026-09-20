@@ -9,6 +9,7 @@ Python**, and renders a **Quarto dashboard** that evaluates the data and the mod
 > 📊 **[View the live interactive dashboard →](https://steve27m.github.io/cfb-analytics/)**
 >
 > 🏈 **Explore the standalone GRIDIRONIQ pages:**
+> [**Team profiles**](https://steve27m.github.io/cfb-analytics/team.html) (one standardized page per team: live 2026 season + every stat with its national rank) ·
 > [**Compare any two teams**](https://steve27m.github.io/cfb-analytics/compare.html) ·
 > [**2026 Forecast Scoreboard**](https://steve27m.github.io/cfb-analytics/forecast.html) ·
 > [**Stat guide**](https://steve27m.github.io/cfb-analytics/glossary.html) ·

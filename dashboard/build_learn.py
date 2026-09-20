@@ -26,8 +26,10 @@ RESULTS = REPO_ROOT / "data" / "results"
 COMPARE_JSON = REPO_ROOT / "data" / "gold" / "compare_data.json"
 GLOSS_TEMPLATE = REPO_ROOT / "dashboard" / "glossary_template.html"
 MODELS_TEMPLATE = REPO_ROOT / "dashboard" / "models_template.html"
+TEAM_TEMPLATE = REPO_ROOT / "dashboard" / "team_template.html"
 GLOSS_OUT = REPO_ROOT / "docs" / "glossary.html"
 MODELS_OUT = REPO_ROOT / "docs" / "models.html"
+TEAM_OUT = REPO_ROOT / "docs" / "team.html"
 
 
 # --------------------------------------------------------------------------- glossary
@@ -340,6 +342,12 @@ def build() -> None:
 
     _inject(GLOSS_TEMPLATE, "__GLOSSARY_DATA__", gloss, GLOSS_OUT)
     _inject(MODELS_TEMPLATE, "__MODELS_DATA__", models, MODELS_OUT)
+    # team.html: one standardized profile for every team — the compare page's team objects
+    # (identity, colors, radar, margins, leaders) plus every Stat Guide metric with its
+    # best -> worst ranking, so a team's value and national rank come from the same numbers
+    # the guide shows. The 2026 block is fetched live from docs/forecast_data.json.
+    team_page = {"season": SEASON, "teams": teams, "groups": gloss["groups"]}
+    _inject(TEAM_TEMPLATE, "__TEAM_DATA__", team_page, TEAM_OUT)
 
 
 if __name__ == "__main__":

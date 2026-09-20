@@ -349,6 +349,7 @@ function render(){
         <span style="font:600 10px 'Space Grotesk';letter-spacing:.16em;color:var(--sub);padding-left:6px;">${live?'2026 SEASON TO DATE':DATA.season+' SEASON'}</span>
       </div>
       <div style="display:flex;gap:2px;flex-wrap:wrap;">
+        <a href="team.html" style="font:600 12px 'Space Grotesk';color:var(--sub);padding:7px 11px;border-radius:8px;text-decoration:none;">Team Profiles</a>
         <a href="forecast.html" style="font:600 12px 'Space Grotesk';color:var(--sub);padding:7px 11px;border-radius:8px;text-decoration:none;">2026 Forecast</a>
         <a href="glossary.html" style="font:600 12px 'Space Grotesk';color:var(--sub);padding:7px 11px;border-radius:8px;text-decoration:none;">Stat Guide</a>
         <a href="models.html" style="font:600 12px 'Space Grotesk';color:var(--sub);padding:7px 11px;border-radius:8px;text-decoration:none;">The Models</a>
@@ -389,14 +390,14 @@ function render(){
           <div style="min-width:0;">
             <div style="font:600 12px 'Space Grotesk';letter-spacing:.2em;color:var(--a);text-transform:uppercase;">${A.conference}</div>
             <div style="font:400 clamp(34px,5vw,60px)/.86 'Anton';text-transform:uppercase;margin-top:5px;">${A.name}</div>
-            <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">${heroChips(A,a26,accA)}</div>
+            <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">${heroChips(A,a26,accA)}<a href="team.html#team=${A.id}" style="white-space:nowrap;font:700 13px 'Saira Condensed';letter-spacing:.06em;padding:5px 11px;border-radius:999px;border:1px solid var(--a);color:var(--a);text-decoration:none;">Team profile →</a></div>
           </div></div>
       </div>
       <div style="position:relative;overflow:hidden;border-radius:20px;border:1px solid var(--border);background:${side?'linear-gradient(245deg,color-mix(in srgb,var(--b) 32%,var(--panel)) 0%,var(--panel) 58%)':'var(--panel)'};padding:20px 22px;display:flex;flex-direction:column;justify-content:center;">
         ${side?`<div style="display:flex;align-items:center;gap:16px;">${crest(B,64)}
             <div style="min-width:0;"><div style="font:600 12px 'Space Grotesk';letter-spacing:.2em;color:var(--b);text-transform:uppercase;">${B.conference}</div>
             <div style="font:400 clamp(28px,4vw,48px)/.86 'Anton';text-transform:uppercase;margin-top:5px;">${B.name}</div>
-            <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">${heroChips(B,b26,accB)}</div></div></div>${meetHtml}`
+            <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">${heroChips(B,b26,accB)}<a href="team.html#team=${B.id}" style="white-space:nowrap;font:700 13px 'Saira Condensed';letter-spacing:.06em;padding:5px 11px;border-radius:999px;border:1px solid var(--b);color:var(--b);text-decoration:none;">Team profile →</a></div></div></div>${meetHtml}`
         :`<div><div style="font:600 11px 'Space Grotesk';letter-spacing:.16em;color:var(--sub);">${live?'IN-SEASON MODEL · NEUTRAL FIELD · RATINGS NOW':'MODEL PROJECTION · NEUTRAL FIELD'}</div>
             <div style="display:flex;align-items:baseline;gap:10px;margin-top:8px;">
               <span style="font:400 46px/1 'Anton';color:var(--favColor);">${pred.favAbbr}</span>
