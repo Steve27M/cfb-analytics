@@ -87,14 +87,17 @@ def build() -> dict | None:
     # per game WITH play-by-play, never per game played
     df["ypg"] = df.off_yds / played
     df["opp_ypg"] = df.def_yds / played
-    df["r_exp"] = _pctile(df.explosiveness)
-    df["r_st"] = _pctile(df.special_teams_rating)
-    df["sos_rank"] = df.sos_metric.rank(ascending=False, method="min")
+    # Round before ranking: the warehouse averages in parallel, so the 15th decimal of a mean
+    # changes from one rebuild to the next, and that noise would otherwise decide which of two
+    # tied teams gets the better rank (and make identical data produce a different file).
+    df["r_exp"] = _pctile(df.explosiveness.round(6))
+    df["r_st"] = _pctile(df.special_teams_rating.round(6))
+    df["sos_rank"] = df.sos_metric.round(6).rank(ascending=False, method="min")
     epa_ok = quality["ok"]
     if epa_ok:
-        df["r_off"] = _pctile(df.epa_off)
-        df["r_def"] = _pctile(df.epa_def, invert=True)
-        df["r_eff"] = _pctile(df.sr_off)
+        df["r_off"] = _pctile(df.epa_off.round(6))
+        df["r_def"] = _pctile(df.epa_def.round(6), invert=True)
+        df["r_eff"] = _pctile(df.sr_off.round(6))
     margins = {t: g.sort_values("week").point_margin.astype(int).tolist()
                for t, g in margins_df.groupby("team")}
 
