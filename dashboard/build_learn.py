@@ -71,110 +71,113 @@ def _dist(teams: list[dict], key: str, dec: int, direction: str = "high",
 # Each stat: how it's defined, how to read it, which direction is "good", and (for numeric
 # fields present in compare_data.json) the live 2025 distribution key + display decimals.
 GLOSSARY_DEFS: list[tuple[str, list[dict]]] = [
-    ("Team Rating & Record", [
-        {"name": "SP+ Rating", "key": "spPlus", "dec": 1, "dir": "high",
-         "def": "A tempo- and opponent-adjusted rating expressed in points: the margin a team "
-                "would be expected to win (or lose) by against a perfectly average FBS team on a "
-                "neutral field.",
-         "read": "Positive is above average, negative below. A team rated +20 facing one rated +5 "
-                 "is favored by ~15 on a neutral field. This is the single best summary of team "
-                 "strength on the dashboard and drives the matchup projection."},
-        {"name": "SP+ Rank", "key": "spRank", "dec": 0, "dir": "rank",
-         "def": "The team's rank (1 = best) among all FBS teams by SP+ rating.",
-         "read": "1 through ~136. Shown as the 'SP+ #' chip on the hero card."},
+    ("Team strength & record", [
+        {"name": "Team Rating", "key": None, "dir": "high",
+         "def": "This project's own rating, in points: how much better or worse than an average "
+                "FBS team, on a neutral field. Every team starts at its preseason strength and "
+                "moves toward its opponent-adjusted scoring margins as games settle.",
+         "read": "This is the rating the site stands behind - it drives the forecast scoreboard "
+                 "and the 2026 team profiles. A team at +20 facing one at +5 is favoured by about "
+                 "15 on neutral turf. It exists only for a season in progress; for a completed "
+                 "season, SP+ below is the strength summary."},
+        {"name": "SP+ Rating", "key": "spPlus", "dec": 1, "dir": "high", "sign": True,
+         "def": "A third-party tempo- and opponent-adjusted rating (Bill Connelly, via "
+                "CollegeFootballData) expressed in points against an average FBS team.",
+         "read": "Not this project's rating - it is ingested, used as a model input, and shown "
+                 "for reference. Positive is above average; the chip on a team page carries the "
+                 "national rank (1 = best)."},
         {"name": "Record", "key": "winPct", "dec": 3, "dir": "high", "disp": "record",
-         "def": "Wins–losses over the season (FBS games with a resolved result).",
-         "read": "Context, not a ranking input — a 10–2 team in a weak league can rate below an "
-                 "8–4 team in a brutal one. Read it next to Strength of Schedule."},
-        {"name": "Win %", "key": "winPct", "dec": 3, "dir": "high",
-         "def": "Share of games won.",
-         "read": "0 to 1. Feeds the win-probability models as win_pct_diff between two teams."},
+         "def": "Wins and losses over the season, from the official records.",
+         "read": "Context, not a ranking input - a 10-2 team in a weak league can rate below an "
+                 "8-4 team in a brutal one. Read it next to Strength of Schedule. Teams are "
+                 "ranked here by win rate, so a 12-1 team outranks an 11-2 one."},
     ]),
-    ("Scoring & Yardage", [
+    ("Scoring & production", [
         {"name": "Points / Game", "key": "ppg", "dec": 1, "dir": "high",
          "def": "Average points scored per game.",
-         "read": "Raw output — not schedule-adjusted, so pad it against Strength of Schedule. "
+         "read": "Raw output - not schedule-adjusted, so read it against Strength of Schedule. "
                  "Combined with the opponent's Points Allowed to project a game's total."},
         {"name": "Points Allowed", "key": "oppPpg", "dec": 1, "dir": "low",
          "def": "Average points surrendered per game.",
-         "read": "Lower is better. A defense-first team can have a low SP+-beating profile here."},
+         "read": "Lower is better. A defence-first team can look ordinary on scoring and still "
+                 "rate highly."},
         {"name": "Yards / Game", "key": "ypg", "dec": 0, "dir": "high",
-         "def": "Average total offensive yards per game.",
-         "read": "Volume, not efficiency — a fast-tempo team runs more plays and piles up yards "
+         "def": "Total offence per game, taken from the official season totals - not counted "
+                "from play-by-play, which records phantom yardage on plays that gained nothing.",
+         "read": "Volume, not efficiency: a fast-tempo team runs more plays and piles up yards "
                  "without necessarily being efficient. Cross-check with EPA and Success Rate."},
         {"name": "Yards Allowed", "key": "oppYpg", "dec": 0, "dir": "low",
-         "def": "Average total yards surrendered per game.",
-         "read": "Lower is better, same tempo caveat as Yards / Game."},
+         "def": "Total offence surrendered per game, from the official season totals.",
+         "read": "Lower is better, with the same tempo caveat as Yards / Game."},
+        {"name": "Turnover Margin", "key": "toMargin", "dec": 0, "dir": "high", "sign": True,
+         "def": "Takeaways minus giveaways over the season, from the official totals.",
+         "read": "The single largest source of luck in a football season. A team riding a big "
+                 "positive margin is usually a candidate to fall back the following year, which "
+                 "is why the forecast models lean on efficiency rather than on this."},
+        {"name": "Third-Down Rate", "key": "thirdDown", "dec": 1, "dir": "high",
+         "def": "Share of third downs converted, from the official totals.",
+         "read": "Situational efficiency: staying on the field. It correlates with Success Rate, "
+                 "but it is the number broadcasts actually quote."},
     ]),
-    ("Advanced Efficiency", [
-        {"name": "EPA / Play (Off)", "key": "epaOff", "dec": 3, "dir": "high",
+    ("Play-by-play efficiency", [
+        {"name": "EPA / Play (Off)", "key": "epaOff", "dec": 3, "dir": "high", "sign": True,
          "def": "Expected Points Added per offensive play. Every game state (down, distance, "
                 "field position) has an expected point value; EPA is how much a play changes it, "
                 "averaged over the season.",
-         "read": "Around zero is average; elite offenses live near +0.20. The most predictive "
-                 "single efficiency number and the biggest driver of the game win-prob model."},
-        {"name": "EPA / Play (Def)", "key": "epaDef", "dec": 3, "dir": "low",
+         "read": "Around zero is average; elite offences live near +0.20. The most predictive "
+                 "single efficiency number and the biggest driver of the game win-probability "
+                 "model. Verified to track CFBD's independent implementation (r about 0.95)."},
+        {"name": "EPA / Play (Def)", "key": "epaDef", "dec": 3, "dir": "low", "sign": True,
          "def": "Expected Points Added allowed per defensive play.",
-         "read": "Negative is good — it means the defense is taking expected points away from "
-                 "offenses. On the profile radar this axis is inverted so 'more is better'."},
-        {"name": "Net EPA / Play", "key": "netEpa", "dec": 3, "dir": "high",
-         "def": "Offensive EPA/play minus defensive EPA/play allowed — one efficiency number for "
-                "the whole team.",
-         "read": "The cleanest one-line efficiency summary; strongly tracks SP+."},
+         "read": "Negative is good - the defence is taking expected points away from offences. "
+                 "On the profile radar this axis is inverted so that more is better."},
+        {"name": "Net EPA / Play", "key": "netEpa", "dec": 3, "dir": "high", "sign": True,
+         "def": "Offensive EPA per play minus defensive EPA per play allowed - one efficiency "
+                "number for the whole team.",
+         "read": "The cleanest one-line efficiency summary; it tracks SP+ closely."},
         {"name": "Success Rate % (Off)", "key": "srOff", "dec": 0, "dir": "high",
-         "def": "Share of plays that are 'successful' — 50%+ of needed yards on 1st down, 70%+ on "
-                "2nd, 100% on 3rd/4th.",
-         "read": "Measures consistency (staying on schedule) rather than explosiveness. ~45%+ is "
-                 "strong. A team can have high EPA from a few huge plays but a mediocre "
-                 "Success Rate — that's a boom-or-bust profile."},
+         "def": "Share of plays that are successful - 50%+ of needed yards on 1st down, 70%+ on "
+                "2nd, 100% on 3rd or 4th.",
+         "read": "Consistency (staying on schedule) rather than explosiveness. About 45%+ is "
+                 "strong. High EPA with a mediocre Success Rate is a boom-or-bust profile."},
         {"name": "Success Rate % (Def)", "key": "srDef", "dec": 0, "dir": "low",
          "def": "Share of opponent plays that were successful.",
-         "read": "Lower is better. Shown on the efficiency split as the rate the defense allows."},
-        {"name": "Explosiveness", "key": "radar.exp", "dec": 0, "dir": "high",
-         "def": "The rate of explosive plays — snaps gaining 15+ yards (garbage time excluded).",
-         "read": "The big-play dimension of an offense. On the radar it's a 0–100 percentile "
-                 "versus FBS. High Success Rate + high Explosiveness is the ideal offense."},
+         "read": "Lower is better. Shown on the efficiency split as the rate the defence allows."},
+        {"name": "Explosive Play Rate", "key": "explosiveness", "dec": 1, "dir": "high",
+         "def": "Share of scrimmage plays gaining 15+ yards, with garbage time excluded.",
+         "read": "The big-play dimension of an offence. This is not the same as CFBD's "
+                 "explosiveness, which averages the predicted points added of successful plays - "
+                 "the two correlate only about 0.48, so this project uses its own name for its "
+                 "own definition. High Success Rate plus a high explosive rate is the ideal."},
     ]),
-    ("Schedule & Talent", [
+    ("Context", [
         {"name": "Strength of Schedule", "key": "sosRank", "dec": 0, "dir": "rank",
          "def": "Rank by the average SP+ rating of the opponents a team actually played "
-                "(1 = toughest slate). Computed from opponents faced because SP+'s own SoS field "
-                "was empty for 2025.",
-         "read": "Read every counting stat through this lens — gaudy scoring against a #120 "
-                 "schedule means less than solid numbers against a #10 one. Feeds the win-prob "
-                 "models as sos_diff."},
+                "(1 = toughest slate). Computed from opponents faced, because the SP+ strength "
+                "of schedule field was empty for this season.",
+         "read": "Read every counting stat through this lens - gaudy scoring against a #120 "
+                 "schedule means less than solid numbers against a #10 one. Feeds the "
+                 "win-probability models."},
         {"name": "Recruiting Rank", "key": "recruitRank", "dec": 0, "dir": "rank",
-         "def": "The team's 247Sports recruiting-class rank (1 = best incoming talent).",
-         "read": "A proxy for raw talent on the roster. The recruiting model shows it explains "
-                 "~37% of the variance in team rating — real signal, far from the whole story."},
+         "def": "The team's 247Sports recruiting-class rank (1 = best incoming talent). Only the "
+                "top ~25 classes per season are published, so most teams have no value.",
+         "read": "A proxy for raw talent. The recruiting model here shows it explains about 37% "
+                 "of the variance in team rating - real signal, far from the whole story."},
+        {"name": "Team Profile Radar", "key": None, "dir": "high",
+         "def": "The six-axis shape on each team page: offence and defence (EPA percentiles), "
+                "special teams (the SP+ component), explosive-play rate, offensive success rate, "
+                "and talent (recruiting rank).",
+         "read": "Each axis is a 0-100 percentile against FBS, so 50 is the median team and 100 "
+                 "is the best in the country. The axes are percentile views of the metrics "
+                 "above, not additional measurements."},
     ]),
     ("Projection", [
         {"name": "2026 Projected Wins", "key": "proj2026", "dec": 1, "dir": "high",
-         "def": "Expected wins next season from the preseason priors model, which forecasts games "
-                "before any 2026 form exists using prior-year strength, returning talent and "
-                "recruiting.",
-         "read": "A preseason expectation, not a guarantee — read it as 'about this many wins if "
-                 "the season played out as expected.' The gauge on the dashboard visualizes it."},
-    ]),
-    ("Team Profile Radar (0–100 percentiles vs FBS)", [
-        {"name": "OFF", "key": "radar.off", "dec": 0, "dir": "high",
-         "def": "Offensive EPA/play, ranked as a percentile across FBS.",
-         "read": "100 = best offense in the country, 50 = median."},
-        {"name": "DEF", "key": "radar.def", "dec": 0, "dir": "high",
-         "def": "Defensive EPA/play allowed, inverted so a higher percentile = a better defense.",
-         "read": "100 = stingiest defense in FBS."},
-        {"name": "ST", "key": "radar.st", "dec": 0, "dir": "high",
-         "def": "Special-teams rating percentile (from SP+'s special-teams component).",
-         "read": "Kicking, returns and field position, relative to FBS."},
-        {"name": "EXP", "key": "radar.exp", "dec": 0, "dir": "high",
-         "def": "Explosive-play-rate percentile (15+ yard plays).",
-         "read": "The big-play axis of the profile."},
-        {"name": "EFF", "key": "radar.eff", "dec": 0, "dir": "high",
-         "def": "Offensive Success Rate percentile.",
-         "read": "The stay-on-schedule / consistency axis."},
-        {"name": "TAL", "key": "radar.tal", "dec": 0, "dir": "high",
-         "def": "Talent percentile from recruiting rank (better rank = higher percentile).",
-         "read": "Roster-talent axis; the recruiting model links this to on-field results."},
+         "def": "Expected wins from the preseason priors model, which forecasts games before any "
+                "current-season form exists, using prior-year strength and recruiting.",
+         "read": "A preseason expectation, not a guarantee - read it as about this many wins if "
+                 "the season plays out as expected. The forecast scoreboard scores it against "
+                 "reality all season."},
     ]),
 ]
 
@@ -202,10 +205,10 @@ def build_glossary(teams: list[dict]) -> dict:
 # schedule come from the live scoreboard on the page itself (FBS opponents only, like the rest of
 # the site), so they are not repeated here. The EPA family is added only when the season's EPA
 # passed team_stats.epa_quality — build_live.py leaves those fields out otherwise.
-LIVE_ALWAYS = {"SP+ Rating", "SP+ Rank", "Yards / Game", "Yards Allowed", "Explosiveness",
-               "ST", "EXP"}
+LIVE_ALWAYS = {"SP+ Rating", "Yards / Game", "Yards Allowed", "Explosive Play Rate",
+               "Turnover Margin", "Third-Down Rate"}
 LIVE_EPA = {"EPA / Play (Off)", "EPA / Play (Def)", "Net EPA / Play", "Success Rate % (Off)",
-            "Success Rate % (Def)", "OFF", "DEF", "EFF"}
+            "Success Rate % (Def)"}
 
 
 def build_live(live: dict) -> dict:

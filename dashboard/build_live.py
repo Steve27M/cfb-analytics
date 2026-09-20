@@ -28,7 +28,7 @@ import pandas as pd
 
 from cfb_analytics.config import DUCKDB_PATH, REPO_ROOT
 from cfb_analytics.reference import check_season
-from cfb_analytics.team_stats import epa_quality, team_stats
+from cfb_analytics.team_stats import EPA_FAMILY, epa_quality, team_stats
 
 LIVE_SEASON = int(os.getenv("CFB_LIVE_SEASON", "2026"))
 LIVE_DB = REPO_ROOT / "data" / "cfb_live.duckdb"
@@ -66,7 +66,11 @@ def build() -> dict | None:
     try:
         quality = epa_quality(con, LIVE_SEASON)
         df = team_stats(con, LIVE_SEASON)
-        reference = check_season(con, LIVE_SEASON, df)
+        # Verify what is PUBLISHED. When epa_quality withholds the EPA family (the in-season
+        # feed is provisional), those columns never reach the page, so they are not claimed and
+        # not checked — the withholding is the safeguard, and the check covers the rest.
+        published = df if quality["ok"] else df.assign(**dict.fromkeys(EPA_FAMILY, None))
+        reference = check_season(con, LIVE_SEASON, published)
         if not reference["ok"]:
             raise SystemExit("reference check FAILED for the live season — refusing to publish")
         pbp = con.execute(f"""
@@ -116,6 +120,8 @@ def build() -> dict | None:
             "spRank": int(t.sp_ranking) if pd.notna(t.sp_ranking) else None,
             "ypg": _num(t.ypg, 0), "oppYpg": _num(t.opp_ypg, 0),
             "sosRank": int(t.sos_rank) if pd.notna(t.sos_rank) else None,
+            "explosiveness": (round(float(t.explosive_rate) * 100, 1)
+                              if pd.notna(t.explosive_rate) else None),
             "toMargin": int(t.turnover_margin) if pd.notna(t.turnover_margin) else None,
             "thirdDown": (round(float(t.third_down_rate) * 100, 1)
                           if pd.notna(t.third_down_rate) else None),

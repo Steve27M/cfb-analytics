@@ -149,7 +149,9 @@ function games26(t){
 
 /* ---------- stat profile: every Stat Guide metric, this team's value + rank ---------- */
 function statRows(t, groups){
-  return groups.map(g=>({name:g.name, stats:g.stats.map(s=>{
+  // entries without a distribution are Stat Guide explainers (the house rating, the radar),
+  // not measurements — they belong in the guide, not on a stat sheet of values and ranks
+  return groups.map(g=>({name:g.name, stats:g.stats.filter(s=>s.dist&&s.dist.ranked).map(s=>{
     const d=s.dist; if(!d||!d.ranked) return {s, missing:true};
     const i=d.ranked.findIndex(r=>r.name===t.name); if(i<0) return {s, missing:true};
     const r=d.ranked[i], n=d.ranked.length, span=(d.max-d.min)||1;
@@ -164,7 +166,8 @@ function statRows(t, groups){
 }
 const DIRTXT={high:'higher is better',low:'lower is better',rank:'lower rank is better'};
 // one entry per underlying measure for the strengths / weaknesses lists
-const EDGE_SKIP=new Set(['SP+ Rank','Win %','Record','OFF','DEF','ST','EXP','EFF','TAL',
+// the best/worst lists rank performance, so leave out identity, summaries and preseason inputs
+const EDGE_SKIP=new Set(['Record','Team Rating','Team Profile Radar',
   'Preseason Rating','Projected Wins (preseason)']);
 
 /* ---------- 2026 stat sheet: computed here from the live scoreboard data ----------
@@ -191,7 +194,9 @@ const DEF26=[
     {name:'Projection Change',key:'dpw',dec:1,dir:'high',sign:true,def:'Current projected wins minus the preseason projection.'},
     {name:'Wins vs Expectation',key:'over',dec:2,dir:'high',sign:true,def:"Actual wins minus the wins the model expected before each kickoff (the sum of its pre-game probabilities). Positive means winning more often than predicted."}]],
 ];
-const COVERED26=new Set(['Record','Win %','Points / Game','Points Allowed','Strength of Schedule','2026 Projected Wins']);
+// already shown by the 2026 block above, or not a ranked stat: never repeat them below
+const COVERED26=new Set(['Record','Points / Game','Points Allowed','Strength of Schedule',
+  '2026 Projected Wins','Team Rating','Team Profile Radar']);
 const LIVE=DATA.live||null;                                   // warehouse stats for the season in progress
 const LIVE_NAMES=new Set(LIVE?LIVE.groups.flatMap(g=>g.stats.map(s=>s.name)):[]);
 const WITHHELD=new Set(LIVE?LIVE.withheld:[]);

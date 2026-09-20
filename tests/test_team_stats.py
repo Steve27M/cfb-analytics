@@ -128,6 +128,7 @@ _spec.loader.exec_module(build_learn)
 def _live(ok: bool) -> dict:
     team = {"name": "Alpha", "abbr": "ALP", "record": "2-0", "games": 2, "pbpGames": 1,
             "spPlus": 12.5, "spRank": 20, "ypg": 410.0, "oppYpg": 300.0, "margins": [21, 3],
+            "explosiveness": 14.2, "toMargin": 3, "thirdDown": 44.0,
             "radar": {"exp": 80.0, "st": 60.0}}
     if ok:
         team.update({"epaOff": 0.2, "epaDef": -0.1, "netEpa": 0.3, "srOff": 48.0, "srDef": 38.0})
@@ -142,8 +143,8 @@ def _live(ok: bool) -> dict:
 def test_failed_gate_keeps_every_epa_metric_off_the_live_sheet():
     out = build_learn.build_live(_live(ok=False))
     names = {s["name"] for g in out["groups"] for s in g["stats"]}
-    assert names == {"SP+ Rating", "SP+ Rank", "Yards / Game", "Yards Allowed", "Explosiveness",
-                     "ST", "EXP"}
+    assert names == {"SP+ Rating", "Yards / Game", "Yards Allowed", "Explosive Play Rate",
+                     "Turnover Margin", "Third-Down Rate"}
     assert "EPA / Play (Off)" in out["withheld"] and "Success Rate % (Off)" in out["withheld"]
     assert out["teams"]["Alpha"]["pbpGames"] == 1 and out["teams"]["Alpha"]["games"] == 2
 
@@ -151,5 +152,6 @@ def test_failed_gate_keeps_every_epa_metric_off_the_live_sheet():
 def test_passing_gate_publishes_the_epa_family():
     out = build_learn.build_live(_live(ok=True))
     names = {s["name"] for g in out["groups"] for s in g["stats"]}
-    assert {"EPA / Play (Off)", "Net EPA / Play", "Success Rate % (Def)", "OFF", "DEF", "EFF"} <= names
+    assert {"EPA / Play (Off)", "Net EPA / Play", "Success Rate % (Def)",
+            "Turnover Margin", "Explosive Play Rate"} <= names
     assert out["withheld"] == []

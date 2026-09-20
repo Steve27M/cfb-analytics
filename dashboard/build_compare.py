@@ -138,6 +138,8 @@ def build() -> dict:
             "srOff": round(float(t["sr_off"]) * 100, 0),
             "srDef": round(float(t["sr_def"]) * 100, 0),
             "sosRank": int(t["sos_rank"]) if pd.notna(t["sos_rank"]) else None,
+            "explosiveness": (round(float(t["explosive_rate"]) * 100, 1)
+                              if pd.notna(t["explosive_rate"]) else None),
             "toMargin": int(t["turnover_margin"]) if pd.notna(t["turnover_margin"]) else None,
             "thirdDown": (round(float(t["third_down_rate"]) * 100, 1)
                           if pd.notna(t["third_down_rate"]) else None),

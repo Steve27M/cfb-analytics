@@ -82,6 +82,10 @@ def correlation(xs: list[float], ys: list[float]) -> float | None:
 def _exact_check(cid: str, name: str, pairs: list[tuple[str, float, float]],
                  tol: float, unit: str) -> dict:
     """pairs: (team, ours, theirs). Fails on any team outside tolerance."""
+    if not pairs:        # the build is not publishing this stat, so it claims nothing about it
+        return {"id": cid, "name": name, "kind": "exact", "ok": True, "n": 0, "n_bad": 0,
+                "not_published": True, "worst": 0.0, "tolerance": tol, "unit": unit,
+                "detail": "not published in this build"}
     bad = [(t, o, r) for t, o, r in pairs if abs(o - r) > tol]
     worst = max((abs(o - r) for _, o, r in pairs), default=0.0)
     return {"id": cid, "name": name, "kind": "exact", "ok": not bad and len(pairs) >= MIN_TEAMS,
@@ -94,6 +98,10 @@ def _exact_check(cid: str, name: str, pairs: list[tuple[str, float, float]],
 
 def _agreement_check(cid: str, name: str, ours: list[float], theirs: list[float],
                      floor: float, against: str) -> dict:
+    if not ours:         # withheld (see team_stats.epa_quality) — nothing is being claimed
+        return {"id": cid, "name": name, "kind": "agrees", "against": against, "ok": True,
+                "n": 0, "corr": None, "floor": floor, "not_published": True,
+                "detail": "not published in this build"}
     r = correlation(ours, theirs)
     return {"id": cid, "name": name, "kind": "agrees", "against": against,
             "ok": bool(r is not None and len(ours) >= MIN_TEAMS and r >= floor),
@@ -179,7 +187,11 @@ def check_season(con: duckdb.DuckDBPyConnection, season: int, published: pd.Data
               "checked_at": datetime.now(UTC).isoformat(timespec="seconds"),
               "source": "CollegeFootballData /stats/season, /stats/season/advanced, /records",
               "checks": checks}
+    n_na = sum(1 for c in checks if c.get("not_published"))
+    report["not_published"] = n_na
     bad = [c for c in checks if not c["ok"]]
+    if n_na:
+        print(f"  reference {season}: {n_na} metric(s) not published in this build — not checked")
     if bad:
         print(f"  reference {season}: FAILED — " + "; ".join(
             f"{c['id']}: {c['detail'][:120]}" for c in bad))
