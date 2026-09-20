@@ -31,10 +31,8 @@ artifacts/metrics.json
 dashboard/**/*.html
 # ...but the hand-written page SOURCES (design + JS with __DATA__ injection tokens, no real data)
 # are tracked so the standalone-page build is reproducible from a clean clone.
-!dashboard/compare_template.html
-!dashboard/glossary_template.html
-!dashboard/models_template.html
-!dashboard/forecast_template.html
+# (one pattern, so a new page template can never be silently ignored)
+!dashboard/*_template.html
 dashboard/**/*_files/
 .quarto/
 # derived dashboard feeds (Python writes these from the warehouse at render time)

@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GRIDIRONIQ — Team Profile</title>
+<meta name="description" content="One standardized profile for every FBS team: the live 2026 season to date (record, rating, projections, schedule) and every Stat Guide metric from 2025 with the team's value and national rank.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Saira+Condensed:wght@500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{margin:0;background:#06070a;color:#f3f6fb;font-family:'Space Grotesk',sans-serif;}
+  a{color:inherit;text-decoration:none;}
+  select{-webkit-appearance:none;appearance:none;cursor:pointer;outline:none;}
+  select option{color:#111;background:#fff;}
+  ::-webkit-scrollbar{width:11px;height:11px;}
+  ::-webkit-scrollbar-track{background:#0c0e13;}
+  ::-webkit-scrollbar-thumb{background:#242833;border-radius:6px;}
+  .wrap{max-width:1200px;margin:0 auto;padding:0 26px;}
+  .sec{display:flex;align-items:center;gap:12px;margin:34px 0 14px;}
+  .sec h2{font:400 22px 'Anton';letter-spacing:.02em;text-transform:uppercase;margin:0;}
+  .sec .line{flex:1;height:1px;background:var(--border);}
+  .sec .hint{font:600 11px 'Space Grotesk';letter-spacing:.14em;color:var(--sub);}
+  .panel{border-radius:16px;border:1px solid var(--border);background:var(--panel);}
+  .crest{flex-shrink:0;border-radius:15px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;box-shadow:0 6px 16px rgba(0,0,0,.45);overflow:hidden;}
+  .crest img{width:78%;height:78%;object-fit:contain;}
+  .navlinks a{font:600 12px 'Space Grotesk';color:var(--sub);padding:7px 11px;border-radius:8px;}
+  .navlinks a:hover{color:var(--text);background:var(--panel);}
+  .navlinks a.active{color:var(--aText);background:var(--a);}
+  .pickers{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .pickers input{font:500 13px 'Space Grotesk';padding:9px 12px;border-radius:9px;border:1px solid var(--border);background:var(--panel2);color:var(--text);outline:none;width:150px;}
+  .pickers input::placeholder{color:var(--sub);}
+  .pickers select{font:600 13px 'Space Grotesk';padding:9px 12px;border-radius:9px;color:var(--text);max-width:270px;border:1px solid var(--border);background:var(--panel2);}
+  .pickers select.main{border-color:var(--a);background:color-mix(in srgb,var(--a) 14%,transparent);}
+  .pickers button{font:700 14px 'Space Grotesk';min-width:34px;height:36px;border-radius:9px;border:1px solid var(--border);background:var(--panel2);color:var(--sub);cursor:pointer;padding:0 10px;}
+  .pickers button:hover{color:var(--text);border-color:var(--sub);}
+  .chip{white-space:nowrap;font:700 13px 'Saira Condensed';letter-spacing:.06em;padding:5px 11px;border-radius:999px;background:var(--panel2);border:1px solid var(--border);}
+  .chip.solid{background:var(--a);color:var(--aText);border-color:var(--a);}
+  .chip .lab{font:600 9px 'Space Grotesk';letter-spacing:.12em;color:var(--sub);margin-right:6px;}
+  .chip.solid .lab{color:var(--aText);opacity:.75;}
+  .kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;}
+  .kpi{padding:16px 18px;position:relative;overflow:hidden;}
+  .kpi::before{content:'';position:absolute;top:0;left:0;width:100%;height:3px;background:linear-gradient(90deg,var(--a),color-mix(in srgb,var(--a) 20%,transparent));}
+  .kpi .k{font:600 11px 'Space Grotesk';letter-spacing:.1em;color:var(--sub);text-transform:uppercase;}
+  .kpi .v{font:800 34px/1 'Saira Condensed';margin-top:10px;}
+  .kpi .s{font:500 12px 'JetBrains Mono';color:var(--sub);margin-top:8px;}
+  .up{color:#3ddc84;} .down{color:#ff6b6b;}
+  /* stat profile */
+  .grp{font:700 11px 'Space Grotesk';letter-spacing:.16em;text-transform:uppercase;color:var(--a);margin:22px 0 10px;}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+  .stat{padding:14px 16px;display:flex;flex-direction:column;gap:8px;}
+  .stat .top{display:flex;align-items:baseline;gap:8px;}
+  .stat .nm{font:600 12.5px 'Space Grotesk';color:var(--sub);flex:1;min-width:0;}
+  .stat .nm a:hover{color:var(--text);text-decoration:underline;}
+  .stat .dir{font:700 9px 'Space Grotesk';letter-spacing:.08em;text-transform:uppercase;color:var(--sub);white-space:nowrap;}
+  .stat .row{display:flex;align-items:baseline;gap:10px;}
+  .stat .val{font:800 30px/1 'Saira Condensed';}
+  .stat .rank{font:700 12px 'JetBrains Mono';padding:3px 8px;border-radius:999px;background:var(--panel2);border:1px solid var(--border);color:var(--sub);}
+  .stat .rank.good{background:#3ddc84;color:#04120a;border-color:#3ddc84;}
+  .stat .rank.bad{background:#ff6b6b;color:#fff;border-color:#ff6b6b;}
+  .stat .track{position:relative;height:8px;border-radius:4px;background:var(--panel2);border:1px solid var(--border);}
+  .stat .fill{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:linear-gradient(90deg,color-mix(in srgb,var(--a) 45%,transparent),var(--a));}
+  .stat .med{position:absolute;top:-3px;width:2px;height:12px;background:var(--text);opacity:.7;border-radius:2px;}
+  .stat .ends{display:flex;justify-content:space-between;font:500 10px 'JetBrains Mono';color:var(--sub);}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  .three{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
+  .list{display:flex;flex-direction:column;}
+  .list .li{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--border);font:500 13px 'Space Grotesk';}
+  .list .li:first-child{border-top:none;}
+  .list .li .r{margin-left:auto;font:700 12px 'JetBrains Mono';}
+  .sched .row{display:grid;grid-template-columns:42px 50px 1fr auto;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--border);font:500 13px 'Space Grotesk';}
+  .sched .row .wk{font:600 10px 'JetBrains Mono';color:var(--sub);}
+  .sched .row .dt{font:500 11px 'JetBrains Mono';color:var(--sub);}
+  .sched .row .opp{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .sched .row .opp a:hover{text-decoration:underline;}
+  .sched .row .site{color:var(--sub);font-weight:400;}
+  .res{font:700 12px 'JetBrains Mono';padding:3px 9px;border-radius:999px;white-space:nowrap;}
+  .res.w{background:#3ddc84;color:#04120a;} .res.l{background:#ff6b6b;color:#fff;}
+  .res.p{background:var(--panel2);border:1px solid var(--border);color:var(--sub);}
+  .res.g{background:var(--panel2);border:1px solid var(--border);color:#ffd166;}
+  .note{font:500 12.5px/1.6 'Space Grotesk';color:var(--sub);}
+  @media(max-width:900px){.kpis{grid-template-columns:1fr 1fr;}.stats{grid-template-columns:1fr 1fr;}.two,.three,.hero{grid-template-columns:1fr !important;}}
+  @media(max-width:560px){.stats{grid-template-columns:1fr;}}
+  @keyframes rise{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+const DATA = __TEAM_DATA__;
+
+/* ---------- helpers shared with the comparison page ---------- */
+function lum(hex){ try{ const c=hex.replace('#','');
+  const r=parseInt(c.slice(0,2),16),g=parseInt(c.slice(2,4),16),b=parseInt(c.slice(4,6),16);
+  return (0.299*r+0.587*g+0.114*b)/255; }catch(e){ return .5; } }
+function txtOn(hex){ return lum(hex)>0.6 ? '#0c0d11' : '#ffffff'; }
+function accent(t){ let a=t.primary; if(lum(a)<0.17){ a=(t.secondary&&lum(t.secondary)>0.2)?t.secondary:'#d7dee8'; } return a; }
+function crest(t,size){
+  const acc=accent(t);
+  return `<div class="crest" style="width:${size}px;height:${size*1.1}px;
+    background:linear-gradient(150deg, ${t.primary} 0%, color-mix(in srgb, ${t.primary} 55%, #06070a) 100%);border-color:${acc};">
+    <img src="${t.logo}" alt="${t.name} logo" loading="lazy"
+      onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'${t.abbr}',style:'font:800 ${size*0.3}px \\'Saira Condensed\\';color:${txtOn(t.primary)}'}))">
+  </div>`;
+}
+const slug=n=>n.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+const fmtNum=(v,dec)=>(typeof v==='number'?v.toLocaleString(undefined,{maximumFractionDigits:dec,minimumFractionDigits:0}):v);
+const signed=v=>(v>=0?'+':'')+v.toFixed(1);
+
+/* ---------- state ---------- */
+const byId={}, byName={}; DATA.teams.forEach(t=>{byId[t.id]=t; byName[t.name]=t;});
+const ORDER=DATA.teams.slice().sort((x,y)=>(x.spRank||999)-(y.spRank||999));   // prev / next walk the SP+ order
+const state={ team: ORDER[0].id, q:'' };
+function readHash(){
+  const h=new URLSearchParams(location.hash.replace(/^#/,'')); const v=h.get('team');
+  if(!v) return; const d=decodeURIComponent(v);
+  if(byId[v]) state.team=v; else if(byName[d]) state.team=byName[d].id; else if(byId[slug(d)]) state.team=slug(d);
+}
+readHash();
+window.addEventListener('hashchange',()=>{ readHash(); render(); window.scrollTo({top:0}); });
+
+/* ---------- 2026 season to date: the live scoreboard's data file ---------- */
+let F=null, FT={}, FG=[], fStatus='loading';
+fetch('forecast_data.json',{cache:'no-cache'})
+  .then(r=>{ if(!r.ok) throw new Error(r.status); return r.json(); })
+  .then(d=>{ F=d; FT={}; (d.teams||[]).forEach(t=>FT[t.team]=t); FG=d.games||[]; fStatus='ready'; })
+  .catch(e=>{ fStatus='unavailable'; console.warn('2026 data unavailable:', e); })
+  .then(()=>render());
+function games26(t){
+  return FG.filter(g=>g.home===t.name||g.away===t.name).map(g=>{
+    const home=g.home===t.name, opp=home?g.away:g.home, p=('pl' in g)?g.pl:g.p;
+    const settled=('hw' in g), won=settled?(home?g.hw:!g.hw):null;
+    const pf=settled?(home?g.hp:g.ap):null, pa=settled?(home?g.ap:g.hp):null;
+    const site=g.neutral?'vs':(g.host?(g.host===t.name?'vs':'at'):(home?'vs':'at'));
+    return {wk:g.wk,date:g.date,opp,site,neutral:g.neutral,pTeam:home?p:1-p,p0:home?g.p:1-g.p,settled,won,pf,pa,
+      margin:settled?pf-pa:null,gone:!!g.gone};
+  }).sort((x,y)=>x.date<y.date?-1:(x.date>y.date?1:0));
+}
+
+/* ---------- stat profile: every Stat Guide metric, this team's value + rank ---------- */
+function statRows(t){
+  return DATA.groups.map(g=>({name:g.name, stats:g.stats.map(s=>{
+    const d=s.dist; if(!d||!d.ranked) return {s, missing:true};
+    const i=d.ranked.findIndex(r=>r.name===t.name); if(i<0) return {s, missing:true};
+    const r=d.ranked[i], n=d.ranked.length, span=(d.max-d.min)||1;
+    let pct=(r.val-d.min)/span; if(s.dir!=='high') pct=1-pct;          // full bar = best in FBS
+    let med=(d.med-d.min)/span; if(s.dir!=='high') med=1-med;
+    const show=r.disp!=null?r.disp:(s.dir==='rank'?'#'+fmtNum(r.val,s.dec):fmtNum(r.val,s.dec));
+    const best=d.ranked[0], worst=d.ranked[n-1];
+    const f=x=>x.disp!=null?x.disp:(s.dir==='rank'?'#'+fmtNum(x.val,s.dec):fmtNum(x.val,s.dec));
+    return {s, rank:i+1, n, pct, med, show, best:`${best.abbr} ${f(best)}`, worst:`${worst.abbr} ${f(worst)}`};
+  })}));
+}
+const DIRTXT={high:'higher is better',low:'lower is better',rank:'lower rank is better'};
+// one entry per underlying measure for the strengths / weaknesses lists
+const EDGE_SKIP=new Set(['SP+ Rank','Win %','Record','OFF','DEF','ST','EXP','EFF','TAL']);
+
+/* ---------- charts ---------- */
+function radar1(t,acc){
+  const S=230,c=S/2,R=76, keys=['off','def','st','exp','eff','tal'], labs=['OFF','DEF','ST','EXP','EFF','TAL'];
+  const grid='rgba(255,255,255,.09)', sub='#8a96a8';
+  const pt=(i,r)=>{const a=(-90+i*60)*Math.PI/180;return [c+r*Math.cos(a),c+r*Math.sin(a)];};
+  const rings=[0.25,0.5,0.75,1].map(f=>`<polygon points="${keys.map((k,j)=>pt(j,R*f).join(',')).join(' ')}" fill="none" stroke="${grid}" stroke-width="1"/>`).join('');
+  const axes=keys.map((k,i)=>{const[x,y]=pt(i,R);return `<line x1="${c}" y1="${c}" x2="${x}" y2="${y}" stroke="${grid}" stroke-width="1"/>`;}).join('');
+  const labels=labs.map((L,i)=>{const[x,y]=pt(i,R+17);return `<text x="${x}" y="${y}" fill="${sub}" font-size="10" font-weight="600" font-family="Space Grotesk" text-anchor="middle" dominant-baseline="middle">${L} ${Math.round(t.radar[keys[i]]||0)}</text>`;}).join('');
+  const poly=keys.map((k,i)=>pt(i,R*(t.radar[k]||0)/100).join(',')).join(' ');
+  const dots=keys.map((k,i)=>{const[x,y]=pt(i,R*(t.radar[k]||0)/100);return `<circle cx="${x}" cy="${y}" r="3" fill="${acc}"/>`;}).join('');
+  return `<svg viewBox="0 0 ${S} ${S}" style="width:100%;max-width:250px;display:block;margin:4px auto 0;">${rings}${axes}${labels}
+    <polygon points="${poly}" fill="${acc}" fill-opacity=".28" stroke="${acc}" stroke-width="2.5"/>${dots}</svg>`;
+}
+function trend1(arr,acc,labels){
+  const W=560,H=200,padL=14,padR=14,padT=20,padB=24, grid='rgba(255,255,255,.09)', sub='#8a96a8';
+  if(!arr.length) return '<div class="note" style="padding:18px 0;text-align:center;">No settled games yet.</div>';
+  const mx=Math.max(...arr,7), mn=Math.min(...arr,-7), n=arr.length;
+  const x=i=>n===1?(padL+(W-padL-padR)/2):padL+i*(W-padL-padR)/(n-1);
+  const y=v=>padT+(mx-v)*(H-padT-padB)/((mx-mn)||1);
+  const zero=y(0), bw=Math.min(38,(W-padL-padR)/n*0.6);
+  const bars=arr.map((v,i)=>{const top=Math.min(y(v),zero),h=Math.max(Math.abs(y(v)-zero),2);
+    return `<rect x="${x(i)-bw/2}" y="${top}" width="${bw}" height="${h}" rx="3" fill="${v>=0?acc:'#ff6b6b'}" fill-opacity="${v>=0?.85:.75}"/>
+      <text x="${x(i)}" y="${v>=0?top-5:zero-5}" fill="#f3f6fb" font-size="11" font-weight="700" font-family="JetBrains Mono" text-anchor="middle">${v>0?'+':''}${v}</text>
+      <text x="${x(i)}" y="${H-6}" fill="${sub}" font-size="10" font-family="Space Grotesk" text-anchor="middle">${labels&&labels[i]?labels[i]:'G'+(i+1)}</text>`;}).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;display:block;">
+    <line x1="${padL}" y1="${zero}" x2="${W-padR}" y2="${zero}" stroke="${grid}" stroke-width="1.5"/>${bars}</svg>`;
+}
+
+/* ---------- pickers ---------- */
+function optionList(){
+  const q=state.q.trim().toLowerCase();
+  const ts=DATA.teams.filter(t=>t.id===state.team || !q || t.name.toLowerCase().includes(q) || t.abbr.toLowerCase().includes(q) || (t.conference||'').toLowerCase().includes(q))
+    .sort((x,y)=>x.name.localeCompare(y.name));
+  return ts.map(t=>`<option value="${t.id}"${t.id===state.team?' selected':''}>${t.name}${t.spRank?' · SP+ #'+t.spRank:''}</option>`).join('');
+}
+function go(id){ if(!byId[id]) return; state.team=id; history.replaceState(null,'','#team='+id); render(); window.scrollTo({top:0}); }
+
+/* ---------- render ---------- */
+function render(){
+  const T=byId[state.team], acc=accent(T), aText=txtOn(acc);
+  const f=fStatus==='ready'?(FT[T.name]||null):null, gs=f?games26(T):[];
+  const vars=`--a:${acc};--a2:color-mix(in srgb,${acc} 55%,#06070a);--aText:${aText};--text:#f3f6fb;--sub:#8a96a8;--border:rgba(255,255,255,.09);--panel:#12151d;--panel2:#0c0e14;`;
+  const idx=ORDER.findIndex(t=>t.id===T.id), prev=ORDER[(idx-1+ORDER.length)%ORDER.length], next=ORDER[(idx+1)%ORDER.length];
+  const G=statRows(T);
+  const flat=G.flatMap(g=>g.stats).filter(x=>!x.missing && !EDGE_SKIP.has(x.s.name));
+  const best=flat.slice().sort((a,b)=>a.rank-b.rank).slice(0,4), worst=flat.slice().sort((a,b)=>b.rank-a.rank).slice(0,4);
+  const builtAt=(F&&F.built_at)?F.built_at.replace('T',' ').slice(0,16)+' UTC':'';
+  const teamLink=n=>byName[n]?`<a href="#team=${byName[n].id}">${n}</a>`:n;
+
+  const statCard=x=>{
+    if(x.missing) return `<div class="panel stat"><div class="top"><span class="nm">${x.s.name}</span></div><div class="row"><span class="val" style="color:var(--sub);">—</span></div><div class="ends"><span>not available for this team</span></div></div>`;
+    const q=x.rank/x.n, cls=q<=0.25?'good':(q>0.75?'bad':'');
+    return `<div class="panel stat" title="${x.s.def.replace(/"/g,'&quot;')}">
+      <div class="top"><span class="nm"><a href="glossary.html#team=${encodeURIComponent(T.name)}">${x.s.name}</a></span><span class="dir">${DIRTXT[x.s.dir]||''}</span></div>
+      <div class="row"><span class="val">${x.show}</span><span class="rank ${cls}">#${x.rank} of ${x.n}</span></div>
+      <div class="track"><div class="fill" style="width:${(x.pct*100).toFixed(1)}%;"></div><div class="med" style="left:${(x.med*100).toFixed(1)}%;" title="FBS median"></div></div>
+      <div class="ends"><span>worst ${x.worst}</span><span>best ${x.best}</span></div></div>`;
+  };
+  const edgeList=(rows,good)=>rows.map(x=>`<div class="li"><span style="width:8px;height:8px;border-radius:2px;background:${good?'#3ddc84':'#ff6b6b'};"></span>${x.s.name}<span class="r" style="color:${good?'#3ddc84':'#ff6b6b'};">#${x.rank}${x.s.dir==='rank'?'':' · '+x.show}</span></div>`).join('');
+  const schedRows=gs.map(g=>{
+    let res;
+    if(g.gone) res=`<span class="res g" title="CFBD no longer lists this game">off sched</span>`;
+    else if(g.settled) res=`<span class="res ${g.won?'w':'l'}" title="model gave ${Math.round(g.pTeam*100)}% before kickoff">${g.won?'W':'L'} ${g.pf}–${g.pa}</span>`;
+    else res=`<span class="res p" title="model win probability (preseason ${Math.round(g.p0*100)}%)">${Math.round(g.pTeam*100)}%</span>`;
+    return `<div class="row"><span class="wk">WK ${g.wk}</span><span class="dt">${g.date.slice(5)}</span>
+      <span class="opp"><span class="site">${g.site}</span> ${teamLink(g.opp)}${g.neutral?' <span class="site">(N)</span>':''}</span>${res}</div>`; }).join('');
+  const settled=gs.filter(g=>g.settled);
+  const left=gs.filter(g=>!g.settled&&!g.gone), expLeft=left.reduce((s,g)=>s+g.pTeam,0);
+  const gameLi=g=>`<div class="li"><span class="site" style="color:var(--sub);">wk ${g.wk} · ${g.site}</span> ${teamLink(g.opp)}<span class="r" style="color:${g.pTeam>=0.5?'#3ddc84':'#ff6b6b'};">${Math.round(g.pTeam*100)}%</span></div>`;
+  const toughest=left.slice().sort((a,b)=>a.pTeam-b.pTeam).slice(0,3);
+  const swing=left.slice().sort((a,b)=>Math.abs(a.pTeam-.5)-Math.abs(b.pTeam-.5)).slice(0,3);
+  const leaders=[['PASSING',T.leaders.pass],['RUSHING',T.leaders.rush],['RECEIVING',T.leaders.rec]].map(([role,l])=>`
+    <div class="li"><span style="font:700 11px 'Space Grotesk';letter-spacing:.06em;color:var(--a);width:78px;flex-shrink:0;">${role}</span>
+      <div style="min-width:0;"><div style="font:700 16px 'Saira Condensed';">${l[0]}</div><div style="font:500 12px 'JetBrains Mono';color:var(--sub);">${l[1]}</div></div></div>`).join('');
+
+  const app=document.getElementById('app');
+  app.style.cssText=`${vars}min-height:100vh;background:radial-gradient(140% 60% at 50% 0%,color-mix(in srgb,var(--a) 20%,#06070a) 0%,#06070a 52%);color:var(--text);padding-bottom:60px;animation:rise .35s ease;`;
+  document.title=`GRIDIRONIQ — ${T.name} team profile`;
+  app.innerHTML=`
+  <div style="position:sticky;top:0;z-index:40;backdrop-filter:blur(14px);background:rgba(8,9,13,.82);border-bottom:1px solid var(--border);">
+    <div class="wrap" style="display:flex;align-items:center;gap:14px;padding:12px 26px;flex-wrap:wrap;">
+      <a href="index.html" style="display:flex;align-items:center;gap:9px;">
+        <span style="width:9px;height:26px;border-radius:3px;background:linear-gradient(var(--a),var(--a2));"></span>
+        <span style="font:800 15px 'Saira Condensed';letter-spacing:.14em;">GRIDIRON<span style="color:var(--a);">IQ</span></span></a>
+      <div class="navlinks" style="display:flex;gap:2px;flex-wrap:wrap;">
+        <a href="team.html" class="active">Team Profiles</a><a href="compare.html">Compare Teams</a><a href="forecast.html">2026 Forecast</a>
+        <a href="glossary.html">Stat Guide</a><a href="models.html">The Models</a></div>
+      <div style="flex:1;"></div>
+      <div class="pickers">
+        <input id="teamQ" type="text" placeholder="Find a team or conference…" value="${state.q.replace(/"/g,'&quot;')}" autocomplete="off" style="width:200px;">
+        <button id="prev" title="Previous by SP+ rank: ${prev.name}">‹</button>
+        <select id="teamSel" class="main">${optionList()}</select>
+        <button id="next" title="Next by SP+ rank: ${next.name}">›</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <!-- hero -->
+    <div class="hero" style="display:grid;grid-template-columns:1.5fr 1fr;gap:16px;margin-top:26px;">
+      <div style="position:relative;overflow:hidden;border-radius:20px;border:1px solid var(--border);background:linear-gradient(115deg,color-mix(in srgb,var(--a) 32%,var(--panel)) 0%,var(--panel) 58%);padding:24px 26px;">
+        <div style="position:absolute;inset:0;background:repeating-linear-gradient(118deg,rgba(255,255,255,.035) 0 2px,transparent 2px 26px);"></div>
+        <div style="position:relative;display:flex;align-items:center;gap:22px;">${crest(T,92)}
+          <div style="min-width:0;">
+            <div style="font:600 12px 'Space Grotesk';letter-spacing:.2em;color:var(--a);text-transform:uppercase;">${T.conference} · team profile</div>
+            <div style="font:400 clamp(36px,5.4vw,66px)/.86 'Anton';text-transform:uppercase;margin-top:5px;">${T.name}</div>
+            <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">
+              ${f?`<span class="chip solid"><span class="lab">2026</span>${f.aw}–${f.al}</span><span class="chip"><span class="lab">RATING</span>#${f.rk} · ${signed(f.rt)}</span>`:''}
+              <span class="chip${f?'':' solid'}"><span class="lab">${DATA.season}</span>${T.record}</span>
+              <span class="chip"><span class="lab">SP+</span>${T.spRank?'#'+T.spRank+' · ':''}${signed(T.spPlus)}</span>
+            </div>
+          </div></div>
+      </div>
+      <div class="panel" style="padding:20px 22px;display:flex;flex-direction:column;gap:12px;justify-content:center;">
+        <div style="font:600 11px 'Space Grotesk';letter-spacing:.16em;color:var(--sub);">GO DEEPER</div>
+        <div class="pickers"><select id="vsSel" style="flex:1;max-width:none;"><option value="">Compare ${T.abbr} with…</option>${DATA.teams.filter(t=>t.id!==T.id).sort((x,y)=>x.name.localeCompare(y.name)).map(t=>`<option value="${t.id}">${t.name}</option>`).join('')}</select></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <a class="chip" href="glossary.html#team=${encodeURIComponent(T.name)}">Mark ${T.abbr} on every Stat Guide ranking →</a>
+          <a class="chip" href="forecast.html">2026 scoreboard →</a></div>
+        <div class="note">Every FBS team gets this same page: the live 2026 season first, then every Stat Guide metric from ${DATA.season} with the team's value and national rank.</div>
+      </div>
+    </div>
+
+    <!-- 2026 season to date -->
+    <div class="sec"><h2>2026 Season to Date</h2><span class="line"></span><span class="hint">${f?'UPDATED '+builtAt:(fStatus==='loading'?'LOADING…':'LIVE DATA UNAVAILABLE')}</span></div>
+    ${f?`
+    <div class="kpis">
+      <div class="panel kpi"><div class="k">Record</div><div class="v">${f.aw}–${f.al}</div><div class="s">${f.left} game${f.left===1?'':'s'} left</div></div>
+      <div class="panel kpi"><div class="k">Rating now</div><div class="v">${signed(f.rt)}</div><div class="s">preseason ${signed(f.rt0)} <span class="${f.rt>=f.rt0?'up':'down'}">${f.rt>=f.rt0?'▲':'▼'}${Math.abs(f.rt-f.rt0).toFixed(1)}</span></div></div>
+      <div class="panel kpi"><div class="k">Rating rank</div><div class="v">#${f.rk}</div><div class="s">of ${DATA.teams.length} · points vs avg FBS team</div></div>
+      <div class="panel kpi"><div class="k">Projected wins</div><div class="v">${f.pwl.toFixed(1)}</div><div class="s">preseason ${f.pw.toFixed(1)} <span class="${f.pwl>=f.pw?'up':'down'}">${f.pwl>=f.pw?'▲':'▼'}${Math.abs(f.pwl-f.pw).toFixed(1)}</span> · of ${f.g}</div></div>
+      <div class="panel kpi"><div class="k">Preseason rank</div><div class="v">#${f.rank}</div><div class="s">by projected wins, frozen July 1</div></div>
+    </div>
+    <div class="two" style="margin-top:16px;">
+      <div class="panel sched" style="padding:16px 18px;">
+        <div style="font:600 12px 'Space Grotesk';letter-spacing:.1em;color:var(--sub);margin-bottom:4px;">SCHEDULE &amp; RESULTS · FBS OPPONENTS</div>
+        ${schedRows||'<div class="note">No FBS-vs-FBS games on the frozen schedule.</div>'}
+        <div class="note" style="margin-top:10px;">Percentages are the model's win probability before kickoff (latest in-season snapshot). Games against FCS opponents carry no prediction and are not listed.</div>
+      </div>
+      <div class="panel" style="padding:16px 18px;">
+        <div style="font:600 12px 'Space Grotesk';letter-spacing:.1em;color:var(--sub);margin-bottom:8px;">SCORING MARGIN · 2026</div>
+        ${trend1(settled.map(g=>g.margin),acc,settled.map(g=>(g.site==='at'?'@':'')+((byName[g.opp]||{}).abbr||g.opp.slice(0,4))))}
+        <div class="note" style="margin-top:10px;">${settled.length?`Average margin ${signed(settled.reduce((s,g)=>s+g.margin,0)/settled.length)} over ${settled.length} settled game${settled.length===1?'':'s'}. The in-season rating moves toward opponent-adjusted margins; the preseason prior counts for two games of evidence.`:'Margins appear once a game against an FBS opponent settles.'}</div>
+        ${left.length?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:14px;">
+          <div class="list"><div style="font:600 11px 'Space Grotesk';letter-spacing:.1em;color:var(--sub);margin-bottom:4px;">TOUGHEST LEFT</div>${toughest.map(gameLi).join('')}</div>
+          <div class="list"><div style="font:600 11px 'Space Grotesk';letter-spacing:.1em;color:var(--sub);margin-bottom:4px;">CLOSEST TO A COIN FLIP</div>${swing.map(gameLi).join('')}</div></div>
+        <div class="note" style="margin-top:10px;">The model expects <b style="color:var(--text);">${expLeft.toFixed(1)}</b> more win${Math.abs(expLeft-1)<0.05?'':'s'} from the ${left.length} game${left.length===1?'':'s'} left, the sum of those probabilities.</div>`:''}
+      </div>
+    </div>`
+    :`<div class="panel note" style="padding:18px 20px;">${fStatus==='loading'?'Loading the live scoreboard data…':'The 2026 block loads from forecast_data.json on the published site (refreshed three times a day). It is unavailable here, so the page shows the '+DATA.season+' profile only.'}</div>`}
+
+    <!-- profile + edges -->
+    <div class="sec"><h2>${DATA.season} Profile</h2><span class="line"></span><span class="hint">PERCENTILES VS FBS · STRENGTHS · WEAKNESSES</span></div>
+    <div class="three">
+      <div class="panel" style="padding:16px 18px;"><div style="font:600 12px 'Space Grotesk';letter-spacing:.1em;color:var(--sub);">TEAM PROFILE RADAR</div>${radar1(T,acc)}</div>
+      <div class="panel list" style="padding:16px 18px;"><div style="font:600 12px 'Space Grotesk';letter-spacing:.1em;color:var(--sub);margin-bottom:6px;">BEST NATIONAL RANKS</div>${edgeList(best,true)}</div>
+      <div class="panel list" style="padding:16px 18px;"><div style="font:600 12px 'Space Grotesk';letter-spacing:.1em;color:var(--sub);margin-bottom:6px;">WORST NATIONAL RANKS</div>${edgeList(worst,false)}</div>
+    </div>
+
+    <!-- every Stat Guide metric -->
+    <div class="sec"><h2>Full Stat Sheet</h2><span class="line"></span><span class="hint">EVERY STAT GUIDE METRIC · VALUE · RANK OF ${DATA.teams.length} · BAR = HOW CLOSE TO THE BEST</span></div>
+    ${G.map(g=>`<div class="grp">${g.name}</div><div class="stats">${g.stats.map(statCard).join('')}</div>`).join('')}
+    <div class="note" style="margin-top:12px;">Each bar is filled toward the best team in FBS for that stat whatever its direction, the white tick is the FBS median, and the rank chip turns green in the top quarter and red in the bottom quarter. Hover a card for the definition, or open the <a href="glossary.html#team=${encodeURIComponent(T.name)}" style="color:var(--a);">Stat Guide</a> for how to read it.</div>
+
+    <!-- 2025 trend + leaders -->
+    <div class="sec"><h2>${DATA.season} Game Log &amp; Leaders</h2><span class="line"></span><span class="hint">POINT DIFFERENTIAL BY GAME · PASSING · RUSHING · RECEIVING</span></div>
+    <div class="two">
+      <div class="panel" style="padding:16px 18px;"><div style="font:600 12px 'Space Grotesk';letter-spacing:.1em;color:var(--sub);margin-bottom:8px;">SCORING MARGIN · ${DATA.season}</div>${trend1(T.margins||[],acc)}</div>
+      <div class="panel list" style="padding:16px 18px;"><div style="font:600 12px 'Space Grotesk';letter-spacing:.1em;color:var(--sub);margin-bottom:6px;">PLAYER LEADERS · ${DATA.season}</div>${leaders}</div>
+    </div>
+
+    <div class="note" style="margin-top:34px;">
+      ${DATA.season} stats from the <a href="https://github.com/Steve27M/cfb-analytics" style="color:var(--a);">cfb-analytics</a> warehouse (SP+, EPA, efficiency, recruiting, player leaders); 2026 season to date from the live
+      <a href="forecast.html" style="color:var(--a);">forecast scoreboard</a>. Data: CollegeFootballData.com. Descriptive analytics, not betting advice. Team names &amp; logos are the property of their respective institutions.
+    </div>
+  </div>`;
+
+  document.getElementById('teamSel').onchange=e=>go(e.target.value);
+  document.getElementById('prev').onclick=()=>go(prev.id);
+  document.getElementById('next').onclick=()=>go(next.id);
+  document.getElementById('teamQ').oninput=e=>{ state.q=e.target.value; document.getElementById('teamSel').innerHTML=optionList(); };
+  document.getElementById('teamQ').onkeydown=e=>{ if(e.key==='Enter'){ const o=[...document.getElementById('teamSel').options].find(o=>o.value!==state.team)||null; const q=state.q.trim(); if(q&&o){ state.q=''; go(o.value); } } };
+  document.getElementById('vsSel').onchange=e=>{ if(e.target.value) location.href=`compare.html#a=${T.id}&b=${e.target.value}${f?'&season=2026':''}`; };
+}
+render();
+</script>
+</body>
+</html>
