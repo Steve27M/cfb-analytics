@@ -7,6 +7,7 @@ append-only. Season files are unioned by name into one table per source.
 """
 from __future__ import annotations
 
+import os
 import re
 from collections import defaultdict
 from pathlib import Path
@@ -15,7 +16,8 @@ import duckdb
 
 from .config import DUCKDB_PATH, REPO_ROOT
 
-BRONZE_DIR = REPO_ROOT / "data" / "bronze"
+# the live lane (run.py live) loads an in-progress season from its own folder into its own DB
+BRONZE_DIR = REPO_ROOT / "data" / os.getenv("CFB_BRONZE_SUBDIR", "bronze")
 _SEASON_RE = re.compile(r"^(?P<name>.+?)__\d{4}\.csv(?:\.gz)?$")
 
 # Per-table column-type overrides: read_csv_auto infers `id_play` (an 18-digit play id)

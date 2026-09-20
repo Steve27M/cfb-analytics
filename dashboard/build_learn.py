@@ -27,6 +27,7 @@ COMPARE_JSON = REPO_ROOT / "data" / "gold" / "compare_data.json"
 GLOSS_TEMPLATE = REPO_ROOT / "dashboard" / "glossary_template.html"
 MODELS_TEMPLATE = REPO_ROOT / "dashboard" / "models_template.html"
 TEAM_TEMPLATE = REPO_ROOT / "dashboard" / "team_template.html"
+LIVE_JSON = REPO_ROOT / "data" / "gold" / "live_team_stats.json"   # written by build_live.py
 GLOSS_OUT = REPO_ROOT / "docs" / "glossary.html"
 MODELS_OUT = REPO_ROOT / "docs" / "models.html"
 TEAM_OUT = REPO_ROOT / "docs" / "team.html"
@@ -193,6 +194,44 @@ def build_glossary(teams: list[dict]) -> dict:
     return {"season": SEASON, "nTeams": len(teams), "groups": groups, "teams": roster}
 
 
+# Stat Guide metrics the live lane can state for the season in progress. Record, scoring and
+# schedule come from the live scoreboard on the page itself (FBS opponents only, like the rest of
+# the site), so they are not repeated here. The EPA family is added only when the season's EPA
+# passed team_stats.epa_quality — build_live.py leaves those fields out otherwise.
+LIVE_ALWAYS = {"SP+ Rating", "SP+ Rank", "Yards / Game", "Yards Allowed", "Explosiveness",
+               "ST", "EXP"}
+LIVE_EPA = {"EPA / Play (Off)", "EPA / Play (Def)", "Net EPA / Play", "Success Rate % (Off)",
+            "Success Rate % (Def)", "OFF", "DEF", "EFF"}
+
+
+def build_live(live: dict) -> dict:
+    """The live season in the same shape as the glossary groups (value + best->worst ranking per
+    stat), plus the provenance the page must show: coverage and the EPA quality verdict."""
+    teams = live["teams"]
+    wanted = LIVE_ALWAYS | (LIVE_EPA if live["epa_quality"]["ok"] else set())
+    stats = []
+    for _, defs in GLOSSARY_DEFS:
+        for s in defs:
+            if s["name"] not in wanted or not s.get("key"):
+                continue
+            dist = _dist(teams, s["key"], s["dec"], s["dir"], s.get("disp"))
+            if dist:
+                stats.append({"name": s["name"], "def": s["def"], "read": s["read"],
+                              "dir": s["dir"], "dec": s["dec"], "dist": dist, "src": "pbp"})
+    return {
+        "season": live["season"], "built_at": live["built_at"],
+        "through_week": live["through_week"], "games_settled": live["games_settled"],
+        "games_with_pbp": live["games_with_pbp"], "epa_quality": live["epa_quality"],
+        "epa_reference": live["epa_reference"],
+        "withheld": sorted(LIVE_EPA) if not live["epa_quality"]["ok"] else [],
+        "teams": {t["name"]: {k: t.get(k) for k in ("record", "games", "pbpGames", "spPlus",
+                                                     "spRank", "radar", "margins")}
+                  for t in teams},
+        "groups": [{"name": f"From the warehouse · {live['season']} · all games through week "
+                            f"{live['through_week']}", "stats": stats}],
+    }
+
+
 # --------------------------------------------------------------------------- models
 
 
@@ -347,6 +386,15 @@ def build() -> None:
     # best -> worst ranking, so a team's value and national rank come from the same numbers
     # the guide shows. The 2026 block is fetched live from docs/forecast_data.json.
     team_page = {"season": SEASON, "teams": teams, "groups": gloss["groups"]}
+    if LIVE_JSON.exists():
+        team_page["live"] = build_live(json.loads(LIVE_JSON.read_text(encoding="utf-8")))
+        q = team_page["live"]["epa_quality"]
+        print(f"  team profiles: live {team_page['live']['season']} stats through week "
+              f"{team_page['live']['through_week']} · EPA "
+              + ("published" if q["ok"]
+                 else f"WITHHELD (winner agreement {q['winner_agreement']})"))
+    else:
+        print("  team profiles: no live_team_stats.json — 2026 view uses the scoreboard + baseline")
     _inject(TEAM_TEMPLATE, "__TEAM_DATA__", team_page, TEAM_OUT)
 
 

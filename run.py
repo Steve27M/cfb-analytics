@@ -70,7 +70,10 @@ def _run(cmd: list[str], env: dict | None = None) -> None:
 
 
 def _dbt(*args: str) -> list[str]:
-    return ["uv", "run", "dbt", *args, "--project-dir", "transform", "--profiles-dir", "transform"]
+    # `python -m` rather than the dbt launcher: uv's script trampoline cannot resolve its own
+    # path under some synced folders (OneDrive), the module entry point always works
+    return ["uv", "run", "python", "-m", "dbt.cli.main", *args,
+            "--project-dir", "transform", "--profiles-dir", "transform"]
 
 
 @app.command()
@@ -182,6 +185,38 @@ def compare() -> None:
     """Build the standalone GRIDIRONIQ pages: comparison + stat guide + models explainer."""
     _run(["uv", "run", "python", "dashboard/build_compare.py"])
     # build_learn reads the compare_data.json that build_compare just wrote
+    _run(["uv", "run", "python", "dashboard/build_learn.py"])
+
+
+# The live lane keeps an in-progress season apart from the sealed ones: its own bronze folder and
+# its own warehouse, built with the SAME dbt models. Nothing here can reach data/cfb.duckdb, so the
+# sealed seasons, the parity-gated models (which hold out the latest COMPLETE season) and the
+# frozen prediction registry are untouched by a half-played season.
+LIVE_LANE = {"CFB_BRONZE_SUBDIR": "bronze_live", "CFB_DUCKDB_PATH": "data/cfb_live.duckdb",
+             "CFB_REFRESH": "1"}
+
+
+@app.command()
+def live(season: int = typer.Argument(2026, help="The season in progress."),
+         skip_ingest: bool = typer.Option(False, help="Rebuild from the bronze already on disk.")
+         ) -> None:
+    """LIVE LANE: refresh the in-progress season (quota-free play-by-play + 5 CFBD calls), rebuild
+    its warehouse with the same dbt models, check the feed's EPA against final scores, and rebuild
+    the team profiles. EPA-derived stats are published only when that check passes."""
+    env = {**os.environ, **LIVE_LANE, "CFB_SEASONS": str(season), "CFB_LIVE_SEASON": str(season)}
+    if not skip_ingest:
+        _run([_find_rscript(), "ingest/ingest_cfbd.R"], env=env)
+    for stale in ("data/cfb_live.duckdb", "data/cfb_live.duckdb.wal"):   # rebuilt from bronze
+        if os.path.exists(stale):
+            os.remove(stale)
+    _run(["uv", "run", "python", "-m", "cfb_analytics.load_bronze"], env=env)
+    _run(_dbt("deps"), env=env)
+    _run(_dbt("run", "--select", "staging", "--exclude", "stg_wiki__recruiting"), env=env)
+    _run(_dbt("snapshot", "--vars", f"snapshot_season: {season}"), env=env)
+    _run(_dbt("run", "--exclude", "stg_wiki__recruiting"), env=env)
+    _run(_dbt("test", "--exclude", "stg_wiki__recruiting"), env=env)
+    _run(["uv", "run", "python", "dashboard/build_live.py"], env={**os.environ,
+                                                                  "CFB_LIVE_SEASON": str(season)})
     _run(["uv", "run", "python", "dashboard/build_learn.py"])
 
 

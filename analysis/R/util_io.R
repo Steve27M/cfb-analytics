@@ -13,6 +13,9 @@ suppressPackageStartupMessages({
 })
 
 cfb_dir <- function(sub) {
+  # The live lane (run.py live) keeps an in-progress season's bronze apart from the sealed
+  # seasons: CFB_BRONZE_SUBDIR=bronze_live. Everything else resolves as before.
+  if (identical(sub, "bronze")) sub <- Sys.getenv("CFB_BRONZE_SUBDIR", "bronze")
   d <- file.path(getwd(), "data", sub)
   dir.create(d, showWarnings = FALSE, recursive = TRUE)
   d

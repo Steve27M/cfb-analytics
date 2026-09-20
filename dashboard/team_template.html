@@ -192,6 +192,9 @@ const DEF26=[
     {name:'Wins vs Expectation',key:'over',dec:2,dir:'high',sign:true,def:"Actual wins minus the wins the model expected before each kickoff (the sum of its pre-game probabilities). Positive means winning more often than predicted."}]],
 ];
 const COVERED26=new Set(['Record','Win %','Points / Game','Points Allowed','Strength of Schedule','2026 Projected Wins']);
+const LIVE=DATA.live||null;                                   // warehouse stats for the season in progress
+const LIVE_NAMES=new Set(LIVE?LIVE.groups.flatMap(g=>g.stats.map(s=>s.name)):[]);
+const WITHHELD=new Set(LIVE?LIVE.withheld:[]);
 function compute26(){
   const mean=a=>a.length?a.reduce((x,v)=>x+v,0)/a.length:null;
   const rows=DATA.teams.map(t=>{ const f=FT[t.name]; if(!f||!('rt' in f)) return null;
@@ -211,7 +214,8 @@ function compute26(){
 }
 function baselineGroup(){   // Stat Guide metrics with no 2026 source, shown as the 2025 baseline
   return {name:`Play-by-play, SP+ & talent · ${DATA.season} baseline`,
-    stats:DATA.groups.flatMap(g=>g.stats).filter(s=>!COVERED26.has(s.name)).map(s=>({...s,badge:String(DATA.season)}))};
+    stats:DATA.groups.flatMap(g=>g.stats).filter(s=>!COVERED26.has(s.name)&&!LIVE_NAMES.has(s.name))
+      .map(s=>({...s,badge:String(DATA.season),why:WITHHELD.has(s.name)?'withheld':'nosource'}))};
 }
 const isLive=()=>state.season==='2026' && fStatus==='ready' && !!S26;
 const hashFor=id=>`#team=${id}${state.season==='2025'?'&season=2025':''}`;
@@ -265,14 +269,16 @@ function render(){
   const live=isLive() && !!f;      // 2026 view; falls back to 2025 when the live data is not available
   const vars=`--a:${acc};--a2:color-mix(in srgb,${acc} 55%,#06070a);--aText:${aText};--text:#f3f6fb;--sub:#8a96a8;--border:rgba(255,255,255,.09);--panel:#12151d;--panel2:#0c0e14;`;
   const ORD=order(), idx=ORD.findIndex(t=>t.id===T.id), prev=ORD[(idx-1+ORD.length)%ORD.length], next=ORD[(idx+1)%ORD.length];
-  const G=live?statRows(T,S26.groups).concat(statRows(T,[baselineGroup()])):statRows(T,DATA.groups);
+  const LG=live&&LIVE?LIVE.groups.map(g=>({...g,stats:g.stats.map(s=>({...s,live:true}))})):[];
+  const G=live?statRows(T,S26.groups).concat(statRows(T,LG),statRows(T,[baselineGroup()])):statRows(T,DATA.groups);
+  const lt=live&&LIVE?(LIVE.teams[T.name]||null):null;      // this team's warehouse coverage for 2026
   const flat=G.flatMap(g=>g.stats).filter(x=>!x.missing && !EDGE_SKIP.has(x.s.name) && !x.s.neutral && !x.s.badge);
   const best=flat.slice().sort((a,b)=>a.rank-b.rank).slice(0,4), worst=flat.slice().sort((a,b)=>b.rank-a.rank).slice(0,4);
   const builtAt=(F&&F.built_at)?F.built_at.replace('T',' ').slice(0,16)+' UTC':'';
   const teamLink=n=>byName[n]?`<a href="${hashFor(byName[n].id)}">${n}</a>`:n;
 
   const statCard=x=>{
-    const bdg=x.s.badge?`<span class="bdg" title="No ${'2026'} source yet: this is the ${x.s.badge} value">${x.s.badge}</span>`:'';
+    const bdg=x.s.badge?`<span class="bdg" title="${x.s.why==='withheld'?'2026 value withheld: this week\'s play-by-play EPA failed the quality check, so this is the '+x.s.badge+' value':'No 2026 source yet: this is the '+x.s.badge+' value'}">${x.s.badge}${x.s.why==='withheld'?' · withheld':''}</span>`:'';
     if(x.missing) return `<div class="panel stat${x.s.badge?' base':''}"><div class="top"><span class="nm">${x.s.name}${bdg}</span></div><div class="row"><span class="val" style="color:var(--sub);">—</span></div><div class="ends"><span>${x.s.live?'no game against an FBS opponent has settled yet':'not available for this team'}</span></div></div>`;
     const q=x.rank/x.n, cls=x.s.neutral?'':(q<=0.25?'good':(q>0.75?'bad':''));
     const nm=x.s.live?x.s.name:`<a href="glossary.html#team=${encodeURIComponent(T.name)}">${x.s.name}</a>`;
@@ -337,7 +343,8 @@ function render(){
             <div style="font:400 clamp(36px,5.4vw,66px)/.86 'Anton';text-transform:uppercase;margin-top:5px;">${T.name}</div>
             <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">
               ${live?`<span class="chip solid"><span class="lab">2026</span>${f.aw}–${f.al}</span><span class="chip"><span class="lab">RATING</span>#${f.rk} · ${signed(f.rt)}</span>
-              <span class="chip"><span class="lab">${DATA.season}</span>${T.record}</span><span class="chip"><span class="lab">${DATA.season} SP+</span>${T.spRank?'#'+T.spRank+' · ':''}${signed(T.spPlus)}</span>`
+              ${lt&&lt.spPlus!=null?`<span class="chip"><span class="lab">2026 SP+</span>${lt.spRank?'#'+lt.spRank+' · ':''}${signed(lt.spPlus)}</span>`:''}
+              <span class="chip"><span class="lab">${DATA.season}</span>${T.record} · SP+ ${T.spRank?'#'+T.spRank:''}</span>`
               :`<span class="chip solid"><span class="lab">${DATA.season}</span>${T.record}</span><span class="chip"><span class="lab">SP+</span>${T.spRank?'#'+T.spRank+' · ':''}${signed(T.spPlus)}</span>
               ${f?`<span class="chip"><span class="lab">2026 SO FAR</span>${f.aw}–${f.al}</span>`:''}`}
             </div>
@@ -394,7 +401,10 @@ function render(){
     <!-- every Stat Guide metric -->
     <div class="sec"><h2>Full Stat Sheet</h2><span class="line"></span><span class="hint">${live?'2026 TO DATE FIRST · THEN THE '+DATA.season+' BASELINE':'EVERY STAT GUIDE METRIC'} · VALUE · NATIONAL RANK · BAR = HOW CLOSE TO THE BEST</span></div>
     ${G.map(g=>`<div class="grp">${g.name}</div><div class="stats">${g.stats.map(statCard).join('')}</div>`).join('')}
-    <div class="note" style="margin-top:12px;">Each bar is filled toward the best team in FBS for that stat whatever its direction, the white tick is the FBS median, and the rank chip turns green in the top quarter and red in the bottom quarter. ${live?`The 2026 cards are computed from settled games against FBS opponents and the in-season model. Yardage, EPA, success rate, explosiveness, SP+, recruiting and the radar need play-by-play that the warehouse has not ingested for 2026, so they appear as the <span class="bdg">${DATA.season}</span> baseline rather than being guessed. `:''}Hover a card for the definition, or open the <a href="glossary.html#team=${encodeURIComponent(T.name)}" style="color:var(--a);">Stat Guide</a> for how to read it.</div>
+    <div class="note" style="margin-top:12px;">Each bar is filled toward the best team in FBS for that stat whatever its direction, the white tick is the FBS median, and the rank chip turns green in the top quarter and red in the bottom quarter. ${live?`The first 2026 cards come from the live scoreboard (games against FBS opponents) and the in-season model.
+      ${LIVE?`The warehouse cards use the same definitions as ${DATA.season}, from play-by-play through week ${LIVE.through_week} (all games); that feed trails the scoreboard by a few days, so ${T.abbr}'s play-based stats cover <b style="color:var(--text);">${lt?lt.pbpGames:0} of ${lt?lt.games:0}</b> games.
+      ${LIVE.epa_quality.ok?'':`<b style="color:#ffd166;">EPA and success rate are withheld for 2026.</b> This week the feed's EPA margins name the actual winner in only ${Math.round(LIVE.epa_quality.winner_agreement*100)}% of ${LIVE.epa_quality.n_games} games (${LIVE.epa_reference.map(r=>r.season+': '+Math.round(r.winner_agreement*100)+'%').join(', ')} in the sealed seasons), so those cards keep the <span class="bdg">${DATA.season}</span> value and will switch to 2026 on their own once the feed passes the check.`}`
+      :`Yardage, EPA, success rate, explosiveness, SP+, recruiting and the radar need play-by-play the warehouse has not ingested for 2026, so they appear as the <span class="bdg">${DATA.season}</span> baseline.`} `:''}Hover a card for the definition, or open the <a href="glossary.html#team=${encodeURIComponent(T.name)}" style="color:var(--a);">Stat Guide</a> for how to read it.</div>
 
     <!-- 2025 trend + leaders -->
     <div class="sec"><h2>${DATA.season} Game Log &amp; Leaders</h2><span class="line"></span><span class="hint">POINT DIFFERENTIAL BY GAME · PASSING · RUSHING · RECEIVING</span></div>

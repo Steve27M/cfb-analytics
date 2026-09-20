@@ -52,6 +52,9 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
 
+[tool.ruff.lint.per-file-ignores]
+"tests/test_team_stats.py" = ["E501"]   # SQL fixtures read better on one line
+
 [tool.mypy]
 python_version = "3.12"
 ignore_missing_imports = true

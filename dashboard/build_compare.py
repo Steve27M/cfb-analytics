@@ -18,6 +18,7 @@ import requests
 
 from cfb_analytics.config import REPO_ROOT
 from cfb_analytics.db import read_only_conn
+from cfb_analytics.team_stats import team_stats
 
 SEASON = 2025
 TEMPLATE = REPO_ROOT / "dashboard" / "compare_template.html"
@@ -27,71 +28,6 @@ OUT_JSON = REPO_ROOT / "data" / "gold" / "compare_data.json"
 
 def _slug(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
-
-
-def _team_stats(con) -> pd.DataFrame:
-    return con.execute(f"""
-        with base as (
-            select school as team, abbreviation as abbr, conference,
-                   color as primary, alt_color as secondary, logo
-            from bronze.teams where cfb_season = {SEASON}
-        ),
-        sp as (
-            select team, sp_rating, sp_ranking, special_teams_rating, strength_of_schedule
-            from silver.silver_ratings_sp where season = {SEASON}
-        ),
-        eff as (
-            select team, avg(offensive_epa_per_play) epa_off, avg(defensive_epa_per_play) epa_def,
-                   avg(offensive_success_rate) sr_off, avg(defensive_success_rate) sr_def,
-                   avg(net_epa_per_play) net_epa
-            from gold.mart_team_efficiency where season = {SEASON} group by team
-        ),
-        rec as (
-            select team, sum(case when won then 1 else 0 end) wins,
-                   sum(case when not won then 1 else 0 end) losses,
-                   avg(points_for) ppg, avg(points_against) opp_ppg, count(*) games
-            from gold.fct_team_game where season = {SEASON} and team_sk <> '-1' group by team
-        ),
-        oy as (select offense_team team, sum(yards_gained) yds from gold.fct_play
-               where season = {SEASON} group by 1),
-        dy as (select defense_team team, sum(yards_gained) yds from gold.fct_play
-               where season = {SEASON} group by 1),
-        expl as (   -- explosive-play rate (share of plays gaining 15+ yards)
-            select offense_team team,
-                   avg(case when yards_gained >= 15 then 1.0 else 0.0 end) exp
-            from gold.fct_play
-            where season = {SEASON} and (is_rush or is_pass_attempt) and not is_garbage_time
-            group by 1
-        ),
-        rk as (
-            select team, recruiting_rank_247 from staging.stg_wiki__recruiting
-            where season = {SEASON}
-        ),
-        proj as (select team, projected_wins from gold.forecast_2026_teams),
-        sos as (   -- strength of schedule = mean SP+ rating of opponents faced (SP+ SoS is null)
-            select tg.team, avg(opp.sp_rating) as opp_sp
-            from gold.fct_team_game tg
-            join silver.silver_ratings_sp opp on tg.opponent = opp.team and opp.season = {SEASON}
-            where tg.season = {SEASON} and tg.team_sk <> '-1'
-            group by tg.team
-        )
-        select base.*, sp.sp_rating, sp.sp_ranking, sp.special_teams_rating,
-               eff.epa_off, eff.epa_def, eff.sr_off, eff.sr_def, eff.net_epa,
-               rec.wins, rec.losses, rec.ppg, rec.opp_ppg, rec.games,
-               oy.yds as off_yds, dy.yds as def_yds, expl.exp as explosiveness,
-               rk.recruiting_rank_247 as recruit_rank, proj.projected_wins as proj_2026_wins,
-               sos.opp_sp as sos_metric
-        from base
-        join rec on base.team = rec.team
-        left join sp on base.team = sp.team
-        left join eff on base.team = eff.team
-        left join oy on base.team = oy.team
-        left join dy on base.team = dy.team
-        left join expl on base.team = expl.team
-        left join rk on base.team = rk.team
-        left join proj on base.team = proj.team
-        left join sos on base.team = sos.team
-    """).fetch_df()
 
 
 def _leaders(key: str) -> dict:
@@ -153,7 +89,7 @@ def _fmt_leader(d: dict | None) -> list:
 def build() -> dict:
     con = read_only_conn()
     try:
-        df = _team_stats(con)
+        df = team_stats(con, SEASON)   # shared with the live lane (build_live.py)
         margins_df = con.execute(f"""
             select team, week, point_margin from gold.fct_team_game
             where season = {SEASON} and team_sk <> '-1' order by team, week, game_id

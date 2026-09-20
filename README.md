@@ -158,6 +158,35 @@ kickoff, no ties, sane scores) and checks each snapshot before writing it. A fai
 sealed, and the workflow fails so it is noticed. See the gate table in
 [`predictions/README.md`](predictions/README.md#validation-gates--what-every-refresh-checks-before-it-scores-or-seals-anything).
 
+## The live lane — an in-progress season without touching the sealed ones
+
+Every model here holds out the latest *complete* season, the parity gate compares R and Python
+on sealed data, and the prediction registry is frozen. A half-played season must not leak into
+any of that, so 2026 runs in its own lane: `python run.py live` pulls the season into
+`data/bronze_live/` (quota-free play-by-play plus five CFBD calls, re-pulled each time because
+an in-progress season is the one place bronze is not immutable), builds `data/cfb_live.duckdb`
+with the **same dbt models**, and feeds the 2026 view of the
+[team profiles](https://steve27m.github.io/cfb-analytics/team.html). Same SQL means a 2026
+yards-per-game or explosiveness figure is defined exactly as its 2025 counterpart. Three dbt
+tests that assume a complete season (two row-count bounds, lines-to-played-games) downgrade to
+warnings in this lane only.
+
+**The live lane checks its source before publishing it.** In-season play-by-play is provisional,
+and in September 2026 its expected-points columns were wrong: summed per game, the EPA margin
+named the actual winner in **54%** of 374 games — a coin flip — against 80% / 80% / 73% for
+2023–2025 (correlation with the final margin 0.30 vs 0.84 / 0.84 / 0.69). Success rate matches
+`EPA > 0` on ~90% of plays, so it inherits the problem; yardage does not. `team_stats.epa_quality`
+runs that comparison on every refresh, and until the season passes (correlation ≥ 0.60, winner
+agreement ≥ 0.70, ≥ 50 games) every EPA-derived metric is **withheld**: the page keeps the 2025
+value, badged, and says why. When the feed is repaired the 2026 numbers appear on the next
+refresh with no code change. Play-based stats are averaged over the games that *have*
+play-by-play (the feed trails the scoreboard by a few days) and the page states that coverage.
+
+*Correction, 2026-09-20:* Yards / Game and Yards Allowed previously summed `yards_gained` over
+every play, which counts field-goal distance (~36 "yards" per attempt), kick and punt returns and
+penalties — an FBS median of 522. They now count scrimmage plays only (rushes, pass attempts,
+sacks): median 401, in line with official total offense. All pages were rebuilt.
+
 ## Case study — engineering & modeling decisions
 
 The point of this repo is craft, not just a result. The decisions that shaped it:

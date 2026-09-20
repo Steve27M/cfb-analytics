@@ -68,7 +68,13 @@ models:
         data_tests:
           - not_null
           - unique
-          - relationships: { to: ref('silver_games'), field: game_id }
+          # sealed seasons: every line belongs to a played game. Live lane: lines already exist
+          # for games that have not kicked off, which silver_games does not hold yet -> warn.
+          - relationships:
+              to: ref('silver_games')
+              field: game_id
+              config:
+                severity: "{{ 'warn' if env_var('CFB_BRONZE_SUBDIR', 'bronze') != 'bronze' else 'error' }}"
       - name: provider_count
         data_tests:
           - dbt_utils.accepted_range: { min_value: 1 }

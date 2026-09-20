@@ -44,6 +44,13 @@ have_key <- nchar(Sys.getenv("CFBD_API_KEY")) > 0
 if (!have_key) message("WARNING: CFBD_API_KEY not set — API endpoints skipped; PBP (quota-free) still loads.")
 PULL_ID <- format(Sys.time(), "%Y%m%dT%H%M%S")
 
+# Sealed seasons are immutable: a file on disk is never re-pulled. An in-progress season is the
+# exception — its games keep settling — so the live lane sets CFB_REFRESH=1, which clears that
+# season's files first (only ever inside the live lane's own bronze directory) and pulls again.
+REFRESH <- identical(Sys.getenv("CFB_REFRESH"), "1")
+if (REFRESH && identical(Sys.getenv("CFB_BRONZE_SUBDIR", "bronze"), "bronze"))
+  stop("CFB_REFRESH=1 is only allowed in the live lane (CFB_BRONZE_SUBDIR != 'bronze'): sealed bronze is immutable.")
+
 # Safely run one CFBD API endpoint: skip if cached, throttle, tolerate per-endpoint failure.
 ingest_api <- function(name, season, fn) {
   if (cfb_bronze_present(name, season)) { message(sprintf("  [skip] %s %d (cached)", name, season)); return(invisible()) }
@@ -56,7 +63,11 @@ ingest_api <- function(name, season, fn) {
 }
 
 for (yr in SEASONS) {
-  message(sprintf("=== Season %d ===", yr))
+  message(sprintf("=== Season %d%s ===", yr, if (REFRESH) " (live refresh)" else ""))
+  if (REFRESH) {
+    old <- list.files(cfb_dir("bronze"), pattern = sprintf("__%d\\.csv(\\.gz)?$", yr), full.names = TRUE)
+    if (length(old)) { file.remove(old); message(sprintf("  [refresh] cleared %d file(s)", length(old))) }
+  }
 
   # Quota-free play-by-play (carries EPA/wp); drives are derived in dbt from PBP.
   # Wide table -> select model columns + gzip to keep it tiny.
