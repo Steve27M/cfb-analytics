@@ -5,8 +5,8 @@
 # Quota strategy (§9: free tier = 1,000 API calls/month + Cloudflare anti-burst):
 #   * Play-by-play loads QUOTA-FREE via cfbfastR::load_cfb_pbp() (cfbfastR data repo,
 #     no CFBD API call, no key) — already carries EPA/wp. Bulk of the data.
-#   * A handful of SEASON-LEVEL cfbd_* endpoints (games, lines, SP+, teams, calendar) spend
-#     the budget — ~5 calls/season. Two seasons ~ 10 calls (well under 1,000/month).
+#   * A handful of SEASON-LEVEL endpoints (games, lines, SP+, teams, calendar, season stats)
+#     spend the budget — ~6 calls/season. Two seasons ~ 10 calls (well under 1,000/month).
 #   * Idempotent + cached: a season already on disk is SKIPPED (0 re-pulls, 0 API spend).
 #   * Throttled: a short sleep between API calls avoids Cloudflare bursts.
 #
@@ -16,6 +16,8 @@
 suppressPackageStartupMessages({
   library(cfbfastR)
   library(dplyr)
+  library(httr)
+  library(jsonlite)
 })
 source("analysis/R/util_io.R")
 
@@ -50,6 +52,28 @@ PULL_ID <- format(Sys.time(), "%Y%m%dT%H%M%S")
 REFRESH <- identical(Sys.getenv("CFB_REFRESH"), "1")
 if (REFRESH && identical(Sys.getenv("CFB_BRONZE_SUBDIR", "bronze"), "bronze"))
   stop("CFB_REFRESH=1 is only allowed in the live lane (CFB_BRONZE_SUBDIR != 'bronze'): sealed bronze is immutable.")
+
+# Official season box-score totals (CFBD /stats/season), long: one row per team per stat.
+# These are the authoritative counting stats (total yards, yards allowed, turnovers, ...).
+# The project does NOT re-derive them from play-by-play: play data carries phantom yardage on
+# non-gaining plays, which silently inflated yards/game by ~3% (and up to 12% for some teams)
+# until it was checked against this endpoint. Play-by-play is used for what only it can do —
+# EPA, success rate, explosive-play rate and the play-level models.
+season_stats <- function(yr) {
+  key <- Sys.getenv("CFBD_API_KEY")
+  resp <- GET("https://api.collegefootballdata.com/stats/season",
+              query = list(year = yr),
+              add_headers(Authorization = paste("Bearer", key)),
+              user_agent(paste0("cfb-analytics/1.0 (portfolio; ",
+                                "+https://github.com/Steve27M/cfb-analytics)")))
+  stop_for_status(resp)
+  d <- fromJSON(content(resp, "text", encoding = "UTF-8"), flatten = TRUE)
+  if (is.null(d) || !nrow(d)) return(NULL)
+  d %>% transmute(season = as.integer(season), team = as.character(team),
+                  conference = as.character(conference),
+                  stat_name = as.character(statName), stat_value = as.numeric(statValue))
+}
+
 
 # Safely run one CFBD API endpoint: skip if cached, throttle, tolerate per-endpoint failure.
 ingest_api <- function(name, season, fn) {
@@ -87,6 +111,7 @@ for (yr in SEASONS) {
   ingest_api("ratings_sp", yr, function() cfbfastR::cfbd_ratings_sp(year = yr))
   ingest_api("teams",      yr, function() cfbfastR::cfbd_team_info(year = yr))
   ingest_api("calendar",   yr, function() cfbfastR::cfbd_calendar(year = yr))
+  ingest_api("season_stats", yr, function() season_stats(yr))
 }
 
 message("Ingestion complete. Files in data/bronze/:")

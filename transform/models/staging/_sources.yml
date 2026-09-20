@@ -25,6 +25,11 @@ sources:
         description: Team metadata — conference, division, venue (cfbd_team_info).
       - name: calendar
         description: Season calendar — weeks & dates (cfbd_calendar).
+      - name: season_stats
+        description: >
+          Official season box-score totals per team (CFBD /stats/season), long format: one row
+          per team per stat. The authoritative source for counting stats (total offense, yards
+          allowed, turnovers, third downs) — these are never re-derived from play-by-play.
       - name: recruiting
         description: >
           TEAM-level recruiting-class rankings (247Sports / Rivals / On3), scraped ethically from

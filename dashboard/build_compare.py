@@ -18,12 +18,14 @@ import requests
 
 from cfb_analytics.config import REPO_ROOT
 from cfb_analytics.db import read_only_conn
+from cfb_analytics.reference import check_season
 from cfb_analytics.team_stats import team_stats
 
 SEASON = 2025
 TEMPLATE = REPO_ROOT / "dashboard" / "compare_template.html"
 OUT_HTML = REPO_ROOT / "docs" / "compare.html"
 OUT_JSON = REPO_ROOT / "data" / "gold" / "compare_data.json"
+REPORT_JSON = REPO_ROOT / "data" / "gold" / "reference_report.json"
 
 
 def _slug(name: str) -> str:
@@ -90,6 +92,13 @@ def build() -> dict:
     con = read_only_conn()
     try:
         df = team_stats(con, SEASON)   # shared with the live lane (build_live.py)
+        # Nothing is published until the numbers have been checked against the official source.
+        report = check_season(con, SEASON, df)
+        REPORT_JSON.parent.mkdir(parents=True, exist_ok=True)
+        REPORT_JSON.write_text(json.dumps(report, indent=2), encoding="utf-8")
+        if not report["ok"]:
+            raise SystemExit("reference check FAILED — refusing to publish (see "
+                             f"{REPORT_JSON.relative_to(REPO_ROOT)})")
         margins_df = con.execute(f"""
             select team, week, point_margin from gold.fct_team_game
             where season = {SEASON} and team_sk <> '-1' order by team, week, game_id
@@ -100,13 +109,11 @@ def build() -> dict:
                for t, g in margins_df.groupby("team")}
 
     df = df.dropna(subset=["sp_rating"]).reset_index(drop=True)
-    df["ypg"] = df["off_yds"] / df["games"]
-    df["opp_ypg"] = df["def_yds"] / df["games"]
     # radar percentiles (0-100) across FBS
     df["r_off"] = _pctile(df["epa_off"])
     df["r_def"] = _pctile(df["epa_def"], invert=True)          # lower EPA allowed = better
     df["r_st"] = _pctile(df["special_teams_rating"].fillna(df["special_teams_rating"].median()))
-    df["r_exp"] = _pctile(df["explosiveness"].fillna(df["explosiveness"].median()))
+    df["r_exp"] = _pctile(df["explosive_rate"].fillna(df["explosive_rate"].median()))
     df["r_eff"] = _pctile(df["sr_off"])
     df["r_tal"] = _pctile(df["recruit_rank"].fillna(130), invert=True)  # better rank = higher
     df["sos_rank"] = df["sos_metric"].rank(ascending=False, method="min")  # tougher schedule = #1
@@ -131,6 +138,9 @@ def build() -> dict:
             "srOff": round(float(t["sr_off"]) * 100, 0),
             "srDef": round(float(t["sr_def"]) * 100, 0),
             "sosRank": int(t["sos_rank"]) if pd.notna(t["sos_rank"]) else None,
+            "toMargin": int(t["turnover_margin"]) if pd.notna(t["turnover_margin"]) else None,
+            "thirdDown": (round(float(t["third_down_rate"]) * 100, 1)
+                          if pd.notna(t["third_down_rate"]) else None),
             "recruitRank": int(t["recruit_rank"]) if pd.notna(t["recruit_rank"]) else None,
             "proj2026": (round(float(t["proj_2026_wins"]), 1)
                          if pd.notna(t["proj_2026_wins"]) else None),

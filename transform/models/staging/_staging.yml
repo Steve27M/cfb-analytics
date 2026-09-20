@@ -122,3 +122,29 @@ models:
         data_tests:
           - not_null
           - dbt_utils.accepted_range: { min_value: 1, max_value: 40 }
+
+  - name: stg_cfbd__season_stats
+    description: >
+      Official season box-score totals per team, pivoted wide. The source of truth for counting
+      stats: total offense and yards allowed come from here, not from play-by-play.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [season, team]
+    columns:
+      - name: season
+        data_tests:
+          - not_null
+          - accepted_values: { values: [2023, 2024, 2025, 2026], quote: false }
+      - name: team
+        data_tests: [not_null]
+      - name: games
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range: { min_value: 1, max_value: 20 }
+      - name: yards_per_game
+        description: Official total offense per game — cross-checked by cfb_analytics.reference.
+        data_tests:
+          - dbt_utils.accepted_range: { min_value: 100, max_value: 800 }
+      - name: yards_allowed_per_game
+        data_tests:
+          - dbt_utils.accepted_range: { min_value: 100, max_value: 800 }

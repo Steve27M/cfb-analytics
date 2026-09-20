@@ -28,6 +28,7 @@ GLOSS_TEMPLATE = REPO_ROOT / "dashboard" / "glossary_template.html"
 MODELS_TEMPLATE = REPO_ROOT / "dashboard" / "models_template.html"
 TEAM_TEMPLATE = REPO_ROOT / "dashboard" / "team_template.html"
 LIVE_JSON = REPO_ROOT / "data" / "gold" / "live_team_stats.json"   # written by build_live.py
+REPORT_JSON = REPO_ROOT / "data" / "gold" / "reference_report.json"  # written by build_compare.py
 GLOSS_OUT = REPO_ROOT / "docs" / "glossary.html"
 MODELS_OUT = REPO_ROOT / "docs" / "models.html"
 TEAM_OUT = REPO_ROOT / "docs" / "team.html"
@@ -191,7 +192,10 @@ def build_glossary(teams: list[dict]) -> dict:
         groups.append({"name": gname, "stats": out_stats})
     roster = sorted(({"name": t["name"], "abbr": t["abbr"]} for t in teams),
                     key=lambda t: t["name"])
-    return {"season": SEASON, "nTeams": len(teams), "groups": groups, "teams": roster}
+    out = {"season": SEASON, "nTeams": len(teams), "groups": groups, "teams": roster}
+    if REPORT_JSON.exists():   # what was verified, and against what
+        out["verification"] = json.loads(REPORT_JSON.read_text(encoding="utf-8"))
+    return out
 
 
 # Stat Guide metrics the live lane can state for the season in progress. Record, scoring and

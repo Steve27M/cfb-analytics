@@ -6,8 +6,10 @@ the comparison page uses, so a 2026 yards-per-game or explosiveness figure means
 the 2025 one means.
 
 Two things differ from a sealed season, and both are reported rather than hidden:
-  * coverage — play-by-play lags the scoreboard by a few days, so play-based stats are averaged
-    over the games that HAVE play-by-play (pbpGames), never over games played;
+  * coverage — play-by-play lags the scoreboard by a few days, so the play-derived metrics
+    (EPA, success rate, explosive-play rate) cover only the games that HAVE play-by-play
+    (pbpGames). Counting stats do not have this problem: they come from the official season
+    totals, which are complete as soon as a game is final;
   * EPA quality — the in-season feed's expected-points columns are provisional. team_stats.
     epa_quality() checks them against final scores on every refresh; when the season fails, every
     EPA-derived metric (EPA/play, net EPA, success rate, the OFF/DEF/EFF radar axes) is withheld
@@ -25,6 +27,7 @@ import duckdb
 import pandas as pd
 
 from cfb_analytics.config import DUCKDB_PATH, REPO_ROOT
+from cfb_analytics.reference import check_season
 from cfb_analytics.team_stats import epa_quality, team_stats
 
 LIVE_SEASON = int(os.getenv("CFB_LIVE_SEASON", "2026"))
@@ -63,6 +66,9 @@ def build() -> dict | None:
     try:
         quality = epa_quality(con, LIVE_SEASON)
         df = team_stats(con, LIVE_SEASON)
+        reference = check_season(con, LIVE_SEASON, df)
+        if not reference["ok"]:
+            raise SystemExit("reference check FAILED for the live season — refusing to publish")
         pbp = con.execute(f"""
             select offense_team as team, count(distinct game_id) as pbp_games
             from gold.fct_play where season = {LIVE_SEASON} group by 1
@@ -83,14 +89,10 @@ def build() -> dict | None:
 
     df = df.merge(pbp, on="team", how="left")
     df["pbp_games"] = df.pbp_games.fillna(0).astype(int)
-    played = df.pbp_games.where(df.pbp_games > 0)
-    # per game WITH play-by-play, never per game played
-    df["ypg"] = df.off_yds / played
-    df["opp_ypg"] = df.def_yds / played
     # Round before ranking: the warehouse averages in parallel, so the 15th decimal of a mean
     # changes from one rebuild to the next, and that noise would otherwise decide which of two
     # tied teams gets the better rank (and make identical data produce a different file).
-    df["r_exp"] = _pctile(df.explosiveness.round(6))
+    df["r_exp"] = _pctile(df.explosive_rate.round(6))
     df["r_st"] = _pctile(df.special_teams_rating.round(6))
     df["sos_rank"] = df.sos_metric.round(6).rank(ascending=False, method="min")
     epa_ok = quality["ok"]
@@ -114,6 +116,9 @@ def build() -> dict | None:
             "spRank": int(t.sp_ranking) if pd.notna(t.sp_ranking) else None,
             "ypg": _num(t.ypg, 0), "oppYpg": _num(t.opp_ypg, 0),
             "sosRank": int(t.sos_rank) if pd.notna(t.sos_rank) else None,
+            "toMargin": int(t.turnover_margin) if pd.notna(t.turnover_margin) else None,
+            "thirdDown": (round(float(t.third_down_rate) * 100, 1)
+                          if pd.notna(t.third_down_rate) else None),
             "radar": {"exp": _num(t.r_exp, 0), "st": _num(t.r_st, 0)},
             "margins": margins.get(t.team, []),
         }
@@ -136,6 +141,7 @@ def build() -> dict | None:
         "through_week": int(through_week) if through_week is not None else 0,
         "games_settled": int(n_settled), "games_with_pbp": int(n_pbp),
         "epa_quality": quality, "epa_reference": _sealed_reference(),
+        "verification": reference,
         "teams": teams,
     }
     # A refresh that finds nothing new must leave the pages byte-identical, so a weekly run does

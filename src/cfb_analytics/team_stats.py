@@ -72,12 +72,21 @@ def epa_quality(con: duckdb.DuckDBPyConnection, season: int) -> dict:
 
 
 def team_stats(con: duckdb.DuckDBPyConnection, season: int) -> pd.DataFrame:
-    """One row per FBS team for <season>: identity, SP+, efficiency, record and scoring (all
-    games), yardage, explosive-play rate, recruiting rank, projected wins, schedule strength.
-    Recruiting and the 2026 projection are optional tables: a lane without them gets nulls."""
+    """One row per FBS team for <season>.
+
+    Sourced (official season totals): yards per game, yards allowed, turnover margin, third-down
+    rate. Derived here from play-by-play: EPA, success rate, explosive-play rate. Third-party:
+    SP+ and the recruiting rank. Recruiting, the 2026 projection and the official totals are
+    optional tables — a lane without one gets nulls rather than a wrong number."""
     rk = ("select team, recruiting_rank_247 from staging.stg_wiki__recruiting "
           f"where season = {season}" if _has(con, "staging", "stg_wiki__recruiting")
           else "select null::varchar as team, null::integer as recruiting_rank_247 where false")
+    official = ("select team, games, yards_per_game, yards_allowed_per_game, turnover_margin, "
+                f"third_down_rate from staging.stg_cfbd__season_stats where season = {season}"
+                if _has(con, "staging", "stg_cfbd__season_stats") else
+                "select null::varchar as team, null::double as games, "
+                "null::double as yards_per_game, null::double as yards_allowed_per_game, "
+                "null::double as turnover_margin, null::double as third_down_rate where false")
     proj = ("select team, projected_wins from gold.forecast_2026_teams"
             if _has(con, "gold", "forecast_2026_teams")
             else "select null::varchar as team, null::double as projected_wins where false")
@@ -103,14 +112,12 @@ def team_stats(con: duckdb.DuckDBPyConnection, season: int) -> pd.DataFrame:
                    avg(points_for) ppg, avg(points_against) opp_ppg, count(*) games
             from gold.fct_team_game where season = {season} and team_sk <> '-1' group by team
         ),
-        -- total offense = scrimmage plays only (rushes, pass attempts, sacks). Summing every
-        -- play's yards_gained also counts field-goal distance (~36 "yards" an attempt), kickoff
-        -- and punt returns and penalty yardage, which inflated yards/game by ~90 (FBS median
-        -- 522 instead of 401).
-        oy as (select offense_team team, sum(yards_gained) yds from gold.fct_play
-               where season = {season} and (is_rush or is_pass_attempt or is_sack) group by 1),
-        dy as (select defense_team team, sum(yards_gained) yds from gold.fct_play
-               where season = {season} and (is_rush or is_pass_attempt or is_sack) group by 1),
+        -- Counting stats come from the OFFICIAL season totals, never from play-by-play. Two
+        -- attempts to derive total offense from plays were both wrong (summing every play
+        -- counted field-goal distance and returns; restricting to scrimmage plays still
+        -- counted phantom yardage the feed records on incomplete passes), and neither error
+        -- was visible until the numbers were checked against this source. See reference.py.
+        off as ({official}),
         expl as (   -- explosive-play rate (share of plays gaining 15+ yards)
             select offense_team team,
                    avg(case when yards_gained >= 15 then 1.0 else 0.0 end) exp
@@ -130,15 +137,16 @@ def team_stats(con: duckdb.DuckDBPyConnection, season: int) -> pd.DataFrame:
         select base.*, sp.sp_rating, sp.sp_ranking, sp.special_teams_rating,
                eff.epa_off, eff.epa_def, eff.sr_off, eff.sr_def, eff.net_epa,
                rec.wins, rec.losses, rec.ppg, rec.opp_ppg, rec.games,
-               oy.yds as off_yds, dy.yds as def_yds, expl.exp as explosiveness,
+               off.yards_per_game as ypg, off.yards_allowed_per_game as opp_ypg,
+               off.games as official_games, off.turnover_margin, off.third_down_rate,
+               expl.exp as explosive_rate,
                rk.recruiting_rank_247 as recruit_rank, proj.projected_wins as proj_2026_wins,
                sos.opp_sp as sos_metric
         from base
         join rec on base.team = rec.team
         left join sp on base.team = sp.team
         left join eff on base.team = eff.team
-        left join oy on base.team = oy.team
-        left join dy on base.team = dy.team
+        left join off on base.team = off.team
         left join expl on base.team = expl.team
         left join rk on base.team = rk.team
         left join proj on base.team = proj.team

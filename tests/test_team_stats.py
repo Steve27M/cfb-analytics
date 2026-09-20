@@ -78,19 +78,36 @@ def lane():
     con.execute("insert into gold.fct_team_game values (?, 'Alpha', 'sk', 'Beta', true, 31, 10)", [SEASON])
     plays = [  # (yards, rush, pass_attempt, sack)
         (12, True, False, False), (20, False, True, False), (-7, False, False, True),
-        (40, False, False, False),    # a 40-yard field goal: not offense
-        (25, False, False, False)]    # a kickoff return: not offense
+        (40, False, False, False),    # a 40-yard field goal: not a scrimmage play
+        (25, False, False, False)]    # a kickoff return: not a scrimmage play
     for y, r, p, s in plays:
         con.execute("insert into gold.fct_play values (1, ?, 'Alpha', 'Beta', ?, 0.1, ?, ?, ?, false)",
                     [SEASON, y, r, p, s])
     return con
 
 
-def test_total_offense_counts_scrimmage_plays_only(lane):
+def _official(con, **vals):
+    con.execute("""create table staging.stg_cfbd__season_stats (season int, team varchar,
+        games double, yards_per_game double, yards_allowed_per_game double,
+        turnover_margin double, third_down_rate double)""")
+    con.execute("insert into staging.stg_cfbd__season_stats values (?,'Alpha',?,?,?,?,?)",
+                [SEASON, vals.get("games", 1.0), vals.get("ypg", 410.0),
+                 vals.get("allowed", 300.0), vals.get("margin", 4.0), vals.get("third", 0.45)])
+
+
+def test_counting_stats_come_from_the_official_totals_not_the_plays(lane):
+    """Play-by-play carries phantom yardage; the published figure must be the official one."""
+    _official(lane, ypg=410.0, allowed=300.0)
     row = ts.team_stats(lane, SEASON).iloc[0]
-    assert row.off_yds == 12 + 20 - 7          # not 90: field-goal distance and returns excluded
+    assert (row.ypg, row.opp_ypg) == (410.0, 300.0)
+    assert (row.turnover_margin, row.third_down_rate) == (4.0, 0.45)
     assert (row.wins, row.losses, row.games, row.ppg) == (1, 0, 1, 31)
-    assert row.explosiveness == 0.5            # 1 of 2 rush/pass plays gained 15+
+    assert row.explosive_rate == 0.5           # still ours: 1 of 2 rush/pass plays gained 15+
+
+
+def test_a_lane_without_the_official_totals_gets_nulls_not_a_guess(lane):
+    row = ts.team_stats(lane, SEASON).iloc[0]
+    assert pd.isna(row.ypg) and pd.isna(row.opp_ypg) and pd.isna(row.turnover_margin)
 
 
 def test_a_lane_without_recruiting_or_projections_gets_nulls(lane):

@@ -183,10 +183,43 @@ value, badged, and says why. When the feed is repaired the 2026 numbers appear o
 refresh with no code change. Play-based stats are averaged over the games that *have*
 play-by-play (the feed trails the scoreboard by a few days) and the page states that coverage.
 
-*Correction, 2026-09-20:* Yards / Game and Yards Allowed previously summed `yards_gained` over
-every play, which counts field-goal distance (~36 "yards" per attempt), kick and punt returns and
-penalties — an FBS median of 522. They now count scrimmage plays only (rushes, pass attempts,
-sacks): median 401, in line with official total offense. All pages were rebuilt.
+## Are the numbers true? — verification against an independent source
+
+dbt tests check that data is **well-formed**: keys unique, ranges sane, foreign keys resolve.
+They cannot tell you a number is **wrong**. Total offense on this site was about 3% high (12% for
+the worst team) for months and passed all 107 of them, because a wrong number is still a
+well-formed number. Twice it was "fixed" by re-deriving it from play-by-play, and twice it was
+still wrong — the feed records phantom yardage on plays that gained nothing.
+
+Two changes close that hole for good:
+
+**Counting stats are sourced, not derived.** Total offense, yards allowed, turnover margin,
+third-down rate and records now come from the official season totals
+(`staging.stg_cfbd__season_stats`, one API call per season). Play-by-play is reserved for what
+only it can do — EPA, success rate, explosive-play rate and the play-level models. Re-deriving a
+figure that an authoritative source already publishes adds risk and no value.
+
+**Every published number is checked before it is published.** `cfb_analytics.reference` compares
+the build against a source produced independently of this pipeline, and `run.py compare` and
+`run.py live` both refuse to publish when a check fails. The result is shown on the
+[Stat Guide](https://steve27m.github.io/cfb-analytics/glossary.html) so a reader can see what was
+verified, when, and against what.
+
+| Kind | What it proves | Current result |
+|---|---|---|
+| Exact | Counting stats match the official season totals, team by team | 816 comparisons, largest gap 0 |
+| Agreement | Metrics this project computes track an independent implementation | EPA 0.95 / 0.93, success rate 0.97 / 0.97 vs CFBD PPA and success rate |
+
+The agreement checks are correlation floors, not equality: CFBD's implementations are defined
+differently, so honest values will not match — but they must move together. A sign flip, a
+scrambled join or a definition drift breaks the correlation; a legitimate methodological
+difference does not. `tests/test_reference.py` proves both directions, including a test that
+reproduces the historical yards bug and confirms the check now catches it.
+
+Explosive-play rate is deliberately *not* checked this way: CFBD's "explosiveness" is the average
+predicted-points-added of successful plays, while this project's is the share of plays gaining
+15+ yards. They correlate only 0.48 because they measure different things — which is why the
+metric here is named **Explosive Play Rate** rather than borrowing their label.
 
 ## Case study — engineering & modeling decisions
 
