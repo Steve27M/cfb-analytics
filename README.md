@@ -162,7 +162,7 @@ sealed, and the workflow fails so it is noticed. See the gate table in
 
 Every model here holds out the latest *complete* season, the parity gate compares R and Python
 on sealed data, and the prediction registry is frozen. A half-played season must not leak into
-any of that, so 2026 runs in its own lane: `uv run python run.py live` (or `.\scripts\live.ps1`,
+any of that, so 2026 runs in its own lane: `uv run python run.py live` (or `scripts\live.cmd`,
 which also syncs, commits and pushes) pulls the season into
 `data/bronze_live/` (quota-free play-by-play plus five CFBD calls, re-pulled each time because
 an in-progress season is the one place bronze is not immutable), builds `data/cfb_live.duckdb`

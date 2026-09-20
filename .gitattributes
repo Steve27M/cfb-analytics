@@ -4,3 +4,5 @@ predictions/** text eol=lf
 # workflows and tests are read by Linux runners; keep them LF too
 .github/** text eol=lf
 tests/** text eol=lf
+# Windows command scripts must keep CRLF line endings
+*.cmd text eol=crlf

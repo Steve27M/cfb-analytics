@@ -1,6 +1,7 @@
 # Refresh the in-progress season (the live lane) and publish it. From the repo root:
-#     .\scripts\live.ps1                 # pull, refresh 2026, rebuild pages, commit, push
-#     .\scripts\live.ps1 --skip-ingest   # rebuild from the bronze already on disk (no API calls)
+#     scripts\live.cmd                 # pull, refresh 2026, rebuild pages, commit, push
+#     scripts\live.cmd --skip-ingest   # rebuild from the bronze already on disk (no API calls)
+# Start it through live.cmd: Windows blocks running an unsigned .ps1 directly by default.
 # Uses the project's uv environment; the global `python` does not have the dependencies.
 Set-Location (Split-Path $PSScriptRoot -Parent)
 
