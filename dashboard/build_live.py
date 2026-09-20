@@ -132,6 +132,18 @@ def build() -> dict | None:
         "epa_quality": quality, "epa_reference": _sealed_reference(),
         "teams": teams,
     }
+    # A refresh that finds nothing new must leave the pages byte-identical, so a weekly run does
+    # not publish a commit whose only change is a timestamp: keep the previous build stamp.
+    unchanged = False
+    if OUT_JSON.exists():
+        try:
+            old = json.loads(OUT_JSON.read_text(encoding="utf-8"))
+            same = {k: v for k, v in old.items() if k != "built_at"} == {
+                k: v for k, v in payload.items() if k != "built_at"}
+            if same:
+                payload["built_at"], unchanged = old["built_at"], True
+        except (ValueError, KeyError):
+            pass
     OUT_JSON.parent.mkdir(parents=True, exist_ok=True)
     OUT_JSON.write_text(json.dumps(payload), encoding="utf-8")
     print(f"  live {LIVE_SEASON}: {len(teams)} teams through week {payload['through_week']} · "
@@ -140,7 +152,7 @@ def build() -> dict | None:
           f"over {quality['n_games']} games -> "
           + ("PASS — EPA-family metrics published" if epa_ok
              else "FAIL — EPA-family metrics WITHHELD (2025 baseline stays on the page)"))
-    print(f"  wrote {OUT_JSON}")
+    print(f"  wrote {OUT_JSON}" + (" (no change since the last refresh)" if unchanged else ""))
     return payload
 
 

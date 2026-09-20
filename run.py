@@ -196,6 +196,22 @@ LIVE_LANE = {"CFB_BRONZE_SUBDIR": "bronze_live", "CFB_DUCKDB_PATH": "data/cfb_li
              "CFB_REFRESH": "1"}
 
 
+def _dbt_summary(what: str) -> None:
+    """One line from dbt's run_results.json: how many passed, warned, failed."""
+    import json
+    from collections import Counter
+    path = REPO_ROOT / "transform" / "target" / "run_results.json"
+    if not path.exists():
+        return
+    c = Counter(r["status"] for r in json.loads(path.read_text(encoding="utf-8"))["results"])
+    ok = c.get("success", 0) + c.get("pass", 0)
+    bad = c.get("error", 0) + c.get("fail", 0)
+    console.print(f"  dbt {what}: [green]{ok} ok[/green], [yellow]{c.get('warn', 0)} warn[/yellow], "
+                  f"[red]{bad} failed[/red]"
+                  + ("  (warnings are the complete-season checks, expected in the live lane)"
+                     if what == "tests" and c.get("warn") and not bad else ""))
+
+
 @app.command()
 def live(season: int = typer.Argument(2026, help="The season in progress."),
          skip_ingest: bool = typer.Option(False, help="Rebuild from the bronze already on disk.")
@@ -210,11 +226,15 @@ def live(season: int = typer.Argument(2026, help="The season in progress."),
         if os.path.exists(stale):
             os.remove(stale)
     _run(["uv", "run", "python", "-m", "cfb_analytics.load_bronze"], env=env)
-    _run(_dbt("deps"), env=env)
-    _run(_dbt("run", "--select", "staging", "--exclude", "stg_wiki__recruiting"), env=env)
-    _run(_dbt("snapshot", "--vars", f"snapshot_season: {season}"), env=env)
-    _run(_dbt("run", "--exclude", "stg_wiki__recruiting"), env=env)
-    _run(_dbt("test", "--exclude", "stg_wiki__recruiting"), env=env)
+    # --quiet: dbt prints only warnings and errors; _dbt_summary() reports the counts
+    _run(_dbt("--quiet", "deps"), env=env)
+    _run(_dbt("--quiet", "run", "--select", "staging", "--exclude", "stg_wiki__recruiting"),
+         env=env)
+    _run(_dbt("--quiet", "snapshot", "--vars", f"snapshot_season: {season}"), env=env)
+    _run(_dbt("--quiet", "run", "--exclude", "stg_wiki__recruiting"), env=env)
+    _dbt_summary("models")
+    _run(_dbt("--quiet", "test", "--exclude", "stg_wiki__recruiting"), env=env)
+    _dbt_summary("tests")
     _run(["uv", "run", "python", "dashboard/build_live.py"], env={**os.environ,
                                                                   "CFB_LIVE_SEASON": str(season)})
     _run(["uv", "run", "python", "dashboard/build_learn.py"])
