@@ -27,11 +27,13 @@ COMPARE_JSON = REPO_ROOT / "data" / "gold" / "compare_data.json"
 GLOSS_TEMPLATE = REPO_ROOT / "dashboard" / "glossary_template.html"
 MODELS_TEMPLATE = REPO_ROOT / "dashboard" / "models_template.html"
 TEAM_TEMPLATE = REPO_ROOT / "dashboard" / "team_template.html"
+INDEX_TEMPLATE = REPO_ROOT / "dashboard" / "index_template.html"
 LIVE_JSON = REPO_ROOT / "data" / "gold" / "live_team_stats.json"   # written by build_live.py
 REPORT_JSON = REPO_ROOT / "data" / "gold" / "reference_report.json"  # written by build_compare.py
 GLOSS_OUT = REPO_ROOT / "docs" / "glossary.html"
 MODELS_OUT = REPO_ROOT / "docs" / "models.html"
 TEAM_OUT = REPO_ROOT / "docs" / "team.html"
+INDEX_OUT = REPO_ROOT / "docs" / "index.html"
 
 
 # --------------------------------------------------------------------------- glossary
@@ -392,6 +394,10 @@ def build() -> None:
     # (identity, colors, radar, margins, leaders) plus every Stat Guide metric with its
     # best -> worst ranking, so a team's value and national rank come from the same numbers
     # the guide shows. The 2026 block is fetched live from docs/forecast_data.json.
+    # the landing page: one sentence of thesis, the live headline, and what was verified
+    _inject(INDEX_TEMPLATE, "__HOME_DATA__",
+            {"season": 2026, "verification": gloss.get("verification")}, INDEX_OUT)
+
     team_page = {"season": SEASON, "teams": teams, "groups": gloss["groups"]}
     if LIVE_JSON.exists():
         team_page["live"] = build_live(json.loads(LIVE_JSON.read_text(encoding="utf-8")))

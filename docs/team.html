@@ -321,8 +321,10 @@ function render(){
         <span style="width:9px;height:26px;border-radius:3px;background:linear-gradient(var(--a),var(--a2));"></span>
         <span style="font:800 15px 'Saira Condensed';letter-spacing:.14em;">GRIDIRON<span style="color:var(--a);">IQ</span></span></a>
       <div class="navlinks" style="display:flex;gap:2px;flex-wrap:wrap;">
-        <a href="team.html" class="active">Team Profiles</a><a href="compare.html">Compare Teams</a><a href="forecast.html">2026 Forecast</a>
-        <a href="glossary.html">Stat Guide</a><a href="models.html">The Models</a></div>
+        <a href="index.html">Home</a><a href="forecast.html">Forecast</a>
+        <a href="team.html" class="active">Teams</a><a href="compare.html">Compare</a>
+        <a href="glossary.html">Stats</a><a href="models.html">Models</a>
+        <a href="research.html">Notebook</a></div>
       <div style="flex:1;"></div>
       <div class="tog" title="${fStatus==='unavailable'?'The 2026 season loads from forecast_data.json on the published site':'Which season this profile shows'}">
         <button id="s26" class="${live?'on':''}" ${fStatus!=='ready'?'disabled':''}>${fStatus==='ready'?'2026 season':(fStatus==='loading'?'2026 · loading…':'2026 · offline')}</button>

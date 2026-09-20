@@ -155,7 +155,8 @@ def parity() -> None:
 @app.command()
 def forecast(season: int = typer.Argument(2026, help="Future season to forecast."),
              freeze: str = typer.Option(None, help="Also seal this run into predictions/<season>/"
-                                                   "<label>/ (immutable registry version).")) -> None:
+                                                   "<label>/ (immutable registry version)."),
+             ) -> None:
     """Score an upcoming (unplayed) season's schedule with the preseason priors model."""
     cmd = ["uv", "run", "python", "-m", "cfb_analytics.forecast", str(season)]
     if freeze:
@@ -166,7 +167,8 @@ def forecast(season: int = typer.Argument(2026, help="Future season to forecast.
 @app.command()
 def inseason(season: int = typer.Argument(2026, help="Live season the model updates."),
              freeze: str = typer.Option(None, help="Seal the fitted in-season model into "
-                                                   "predictions/<season>/<label>/ (immutable).")) -> None:
+                                                   "predictions/<season>/<label>/ (immutable)."),
+             ) -> None:
     """In-season update model: seal the fitted model (--freeze LABEL) and/or take a snapshot."""
     if freeze:
         _run(["uv", "run", "python", "-m", "cfb_analytics.inseason", "freeze", str(season), freeze])
@@ -206,10 +208,11 @@ def _dbt_summary(what: str) -> None:
     c = Counter(r["status"] for r in json.loads(path.read_text(encoding="utf-8"))["results"])
     ok = c.get("success", 0) + c.get("pass", 0)
     bad = c.get("error", 0) + c.get("fail", 0)
-    console.print(f"  dbt {what}: [green]{ok} ok[/green], [yellow]{c.get('warn', 0)} warn[/yellow], "
+    warn = c.get("warn", 0)
+    console.print(f"  dbt {what}: [green]{ok} ok[/green], [yellow]{warn} warn[/yellow], "
                   f"[red]{bad} failed[/red]"
                   + ("  (warnings are the complete-season checks, expected in the live lane)"
-                     if what == "tests" and c.get("warn") and not bad else ""))
+                     if what == "tests" and warn and not bad else ""))
 
 
 @app.command()
@@ -256,9 +259,10 @@ def dashboard() -> None:
         lines = src.read_text(encoding="utf-8").splitlines(keepends=True)
         src.write_text("".join(x for x in lines if not any(m in x for m in markers)),
                        encoding="utf-8")
-        # GitHub Pages serves docs/; make the dashboard the site root at docs/index.html.
-        shutil.copyfile(src, REPO_ROOT / "docs" / "index.html")
-        console.print("[green]Published docs/index.html for GitHub Pages.[/green]")
+        # The site root is the hand-built landing page (dashboard/index_template.html, written
+        # by build_learn). This render is the research notebook behind it.
+        shutil.copyfile(src, REPO_ROOT / "docs" / "research.html")
+        console.print("[green]Published docs/research.html (research notebook).[/green]")
 
 
 @app.callback(invoke_without_command=True)

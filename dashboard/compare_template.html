@@ -349,10 +349,9 @@ function render(){
         <span style="font:600 10px 'Space Grotesk';letter-spacing:.16em;color:var(--sub);padding-left:6px;">${live?'2026 SEASON TO DATE':DATA.season+' SEASON'}</span>
       </div>
       <div style="display:flex;gap:2px;flex-wrap:wrap;">
-        <a href="team.html" style="font:600 12px 'Space Grotesk';color:var(--sub);padding:7px 11px;border-radius:8px;text-decoration:none;">Team Profiles</a>
-        <a href="forecast.html" style="font:600 12px 'Space Grotesk';color:var(--sub);padding:7px 11px;border-radius:8px;text-decoration:none;">2026 Forecast</a>
-        <a href="glossary.html" style="font:600 12px 'Space Grotesk';color:var(--sub);padding:7px 11px;border-radius:8px;text-decoration:none;">Stat Guide</a>
-        <a href="models.html" style="font:600 12px 'Space Grotesk';color:var(--sub);padding:7px 11px;border-radius:8px;text-decoration:none;">The Models</a>
+        ${[['index.html','Home'],['forecast.html','Forecast'],['team.html','Teams'],
+            ['glossary.html','Stats'],['models.html','Models'],['research.html','Notebook']]
+           .map(([h,t])=>`<a href="${h}" style="font:600 12px 'Space Grotesk';color:var(--sub);padding:7px 11px;border-radius:8px;text-decoration:none;">${t}</a>`).join('')}
       </div>
       <div style="flex:1;"></div>
       <div class="tog" title="${fStatus==='unavailable'?'2026 data is loaded from forecast_data.json (needs the site, not a local file)':'Which season the comparison is about'}">
