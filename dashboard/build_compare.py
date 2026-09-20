@@ -127,7 +127,6 @@ def build() -> dict:
             "id": _slug(t["team"]), "abbr": t["abbr"] or t["team"][:4].upper(),
             "name": t["team"], "conference": t["conference"] or "FBS",
             "primary": t["primary"] or "#888888", "secondary": t["secondary"] or "#cccccc",
-            "logo": (t["logo"] or "").replace("http://", "https://"),
             "record": f"{int(t['wins'])}-{int(t['losses'])}",
             "spRank": int(t["sp_ranking"]) if pd.notna(t["sp_ranking"]) else None,
             "spPlus": round(float(t["sp_rating"]), 1),

@@ -221,6 +221,21 @@ predicted-points-added of successful plays, while this project's is the share of
 15+ yards. They correlate only 0.48 because they measure different things — which is why the
 metric here is named **Explosive Play Rate** rather than borrowing their label.
 
+## Licence, data and team marks
+
+The code is MIT-licensed (see [`LICENSE`](LICENSE)). That licence covers the pipeline, models,
+page builders and tests — not the data they read, which belongs to its sources:
+CollegeFootballData (schedules, results, official season totals, SP+, betting lines), cfbfastR
+(play-by-play) and Wikipedia (recruiting-class ranks, CC BY-SA, attributed in place). Raw feed
+data is never committed or republished; what this site publishes is derived aggregates and this
+project's own model output, which CFBD's terms expressly permit.
+
+**Team marks.** Earlier versions of the comparison and team pages displayed each team's logo by
+hotlinking a third-party CDN. They no longer do: a team is drawn as its own colours plus its
+abbreviation. That removes a third-party request from every page load, and with it any question
+about whose bandwidth and whose trademark were being used. Team names and colours are used only
+to identify the teams being analysed.
+
 ## Case study — engineering & modeling decisions
 
 The point of this repo is craft, not just a result. The decisions that shaped it:
@@ -236,7 +251,8 @@ honors the contract rather than smuggling a bridge back in.
 **Every method is built twice, and that's a test.** M1–M7 and the game model are each implemented
 in R *and* Python on the identical feed. Because the fits are mathematically the same (OLS, IRLS
 GLM, Poisson, logistic MLE), their coefficients *must* agree — so `load_results` **fails the build**
-if any term diverges beyond tolerance (currently 23/23 agree; unsupervised/mixed-effects methods
+if any term diverges beyond tolerance (currently 34/34 agree across 9 models; unsupervised
+and mixed-effects methods
 are checked label-invariantly — PC correlation, cluster ARI, BLUP correlation). This gate earned its
 keep: it immediately flagged a **perfect-collinearity bug** in the game model (`net_epa_diff =
 off_epa_diff − def_epa_diff`), where R's `glm` silently dropped a term while `sklearn` split the

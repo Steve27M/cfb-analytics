@@ -77,13 +77,16 @@ function normCdf(z){ const t=1/(1+0.2316419*Math.abs(z)); const d=0.3989423*Math
   let p=d*t*(0.3193815+t*(-0.3565638+t*(1.781478+t*(-1.821256+t*1.330274)))); return z>0?1-p:p; }
 
 /* ---------- crest = team-coloured badge holding the real logo ---------- */
+/* A team's mark is its own trademark, served from a third party's CDN. This project does not
+   hotlink those images: each team is shown as its own colours plus its abbreviation, which needs
+   no third-party request and raises no question about whose bandwidth or rights are being used. */
 function crest(t,size){
   const acc=accent(t);
   return `<div class="crest" style="width:${size}px;height:${size*1.1}px;
     background:linear-gradient(150deg, ${t.primary} 0%, color-mix(in srgb, ${t.primary} 55%, #06070a) 100%);
-    border-color:${acc};">
-    <img src="${t.logo}" alt="${t.name} logo" loading="lazy"
-      onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'${t.abbr}',style:'font:800 ${size*0.3}px \\'Saira Condensed\\';color:${txtOn(t.primary)}'}))">
+    border-color:${acc};" title="${t.name}">
+    <span style="font:800 ${Math.round(size*0.34)}px 'Saira Condensed';letter-spacing:.02em;
+      color:${txtOn(t.primary)};">${t.abbr}</span>
   </div>`;
 }
 

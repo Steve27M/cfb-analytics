@@ -92,8 +92,10 @@ def team_stats(con: duckdb.DuckDBPyConnection, season: int) -> pd.DataFrame:
             else "select null::varchar as team, null::double as projected_wins where false")
     return con.execute(f"""
         with base as (
+            -- no `logo`: that column is a third-party CDN URL for a team's trademark, and
+            -- this project neither hotlinks nor republishes it (see LICENSE)
             select school as team, abbreviation as abbr, conference,
-                   color as primary, alt_color as secondary, logo
+                   color as primary, alt_color as secondary
             from bronze.teams where cfb_season = {season}
         ),
         sp as (

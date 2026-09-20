@@ -104,12 +104,16 @@ function lum(hex){ try{ const c=hex.replace('#','');
   return (0.299*r+0.587*g+0.114*b)/255; }catch(e){ return .5; } }
 function txtOn(hex){ return lum(hex)>0.6 ? '#0c0d11' : '#ffffff'; }
 function accent(t){ let a=t.primary; if(lum(a)<0.17){ a=(t.secondary&&lum(t.secondary)>0.2)?t.secondary:'#d7dee8'; } return a; }
+/* A team's mark is its own trademark, served from a third party's CDN. This project does not
+   hotlink those images: each team is shown as its own colours plus its abbreviation, which needs
+   no third-party request and raises no question about whose bandwidth or rights are being used. */
 function crest(t,size){
   const acc=accent(t);
   return `<div class="crest" style="width:${size}px;height:${size*1.1}px;
-    background:linear-gradient(150deg, ${t.primary} 0%, color-mix(in srgb, ${t.primary} 55%, #06070a) 100%);border-color:${acc};">
-    <img src="${t.logo}" alt="${t.name} logo" loading="lazy"
-      onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'${t.abbr}',style:'font:800 ${size*0.3}px \\'Saira Condensed\\';color:${txtOn(t.primary)}'}))">
+    background:linear-gradient(150deg, ${t.primary} 0%, color-mix(in srgb, ${t.primary} 55%, #06070a) 100%);
+    border-color:${acc};" title="${t.name}">
+    <span style="font:800 ${Math.round(size*0.34)}px 'Saira Condensed';letter-spacing:.02em;
+      color:${txtOn(t.primary)};">${t.abbr}</span>
   </div>`;
 }
 const slug=n=>n.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
