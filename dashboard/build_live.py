@@ -123,6 +123,9 @@ def build() -> dict | None:
             row["radar"].update({"off": _num(t.r_off, 0), "def": _num(t.r_def, 0),
                                  "eff": _num(t.r_eff, 0)})
         teams.append(row)
+    # the live warehouse is rebuilt from scratch on every refresh and SQL returns rows in no
+    # particular order: sort, so identical data always produces an identical file
+    teams.sort(key=lambda r: r["name"])
 
     payload = {
         "season": LIVE_SEASON,
